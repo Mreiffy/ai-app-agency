@@ -23,3 +23,9 @@
 - **Location:** `/data/.openclaw/workspace/skills/summarize/`
 - **Status:** macOS ARM64 only
 - **Linux Alternative:** Use Firecrawl for web, yt-dlp for YouTube
+
+## YouTube Watcher
+- **Location:** `/data/.openclaw/workspace/skills/youtube-watcher/`
+- **Status:** ✅ Ready
+- **Dependencies:** yt-dlp (installed)
+- **Usage:** `python3 /data/.openclaw/workspace/skills/youtube-watcher/scripts/get_transcript.py "URL"`
