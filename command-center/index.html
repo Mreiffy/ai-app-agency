@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agency Command Center</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root{--bg:#0a0a0f;--surface:#111118;--elevated:#1a1a22;--hover:#22222c;--border:#2a2a35;--border-light:#363640;--text:#ffffff;--text-secondary:#a0a0b0;--text-tertiary:#6b6b7b;--accent:#6366f1;--accent-light:#818cf8;--success:#22c55e;--warning:#f59e0b;--danger:#ef4444;--info:#3b82f6}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5}
+        .app{display:grid;grid-template-columns:280px 1fr 360px;min-height:100vh}
+        .sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+        .sidebar-header{padding:24px 20px;border-bottom:1px solid var(--border)}
+        .brand{display:flex;align-items:center;gap:12px}
+        .brand-icon{width:40px;height:40px;background:linear-gradient(135deg,var(--accent),#8b5cf6);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 20px rgba(99,102,241,0.3)}
+        .brand-text h1{font-size:16px;font-weight:700;letter-spacing:-0.3px}
+        .brand-text span{font-size:11px;color:var(--text-tertiary);font-weight:500;text-transform:uppercase;letter-spacing:0.5px}
+        .nav-section{padding:20px 16px;flex:1;overflow-y:auto}
+        .nav-title{font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.8px;padding:0 12px;margin-bottom:12px}
+        .agent-list{display:flex;flex-direction:column;gap:8px}
+        .agent-card{display:flex;align-items:center;gap:12px;padding:12px;border-radius:10px;cursor:pointer;transition:all 0.2s;border:1px solid transparent}
+        .agent-card:hover{background:var(--elevated);border-color:var(--border)}
+        .agent-card.active{background:var(--elevated);border-color:var(--accent)}
+        .agent-avatar{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;background:var(--bg);border:1px solid var(--border)}
+        .agent-info{flex:1;min-width:0}
+        .agent-name{font-size:14px;font-weight:600;margin-bottom:2px}
+        .agent-role{font-size:12px;color:var(--text-tertiary)}
+        .agent-status{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:500;margin-top:4px}
+        .status-dot{width:6px;height:6px;border-radius:50%}
+        .status-online{background:var(--success);box-shadow:0 0 6px var(--success)}
+        .status-working{background:var(--accent);box-shadow:0 0 6px var(--accent);animation:pulse 2s infinite}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+        .sidebar-footer{padding:16px;border-top:1px solid var(--border)}
+        .metric-row{display:flex;justify-content:space-between;padding:8px 0;font-size:13px;border-bottom:1px solid var(--border)}
+        .metric-row:last-child{border-bottom:none}
+        .metric-label{color:var(--text-secondary)}
+        .metric-value{font-weight:600;font-family:'JetBrains Mono',monospace}
+        .main{display:flex;flex-direction:column;min-height:100vh}
+        .header{height:64px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:10}
+        .header-left{display:flex;align-items:center;gap:24px}
+        .breadcrumb{font-size:14px;color:var(--text-secondary)}.breadcrumb span{color:var(--text);font-weight:600}
+        .header-actions{display:flex;align-items:center;gap:12px}
+        .btn{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.2s;border:none;font-family:inherit}
+        .btn-secondary{background:var(--elevated);color:var(--text);border:1px solid var(--border)}.btn-secondary:hover{background:var(--hover);border-color:var(--border-light)}
+        .btn-primary{background:var(--accent);color:white;font-weight:600}.btn-primary:hover{background:var(--accent-light);transform:translateY(-1px);box-shadow:0 4px 20px rgba(99,102,241,0.3)}
+        .content{flex:1;padding:24px;overflow-y:auto}
+        .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+        .section-title{font-size:18px;font-weight:700}.section-subtitle{font-size:13px;color:var(--text-secondary);margin-top:4px}
+        .activity-feed{display:flex;flex-direction:column;gap:12px}
+        .activity-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;transition:all 0.2s;animation:slideIn 0.3s ease}
+        @keyframes slideIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+        .activity-card:hover{border-color:var(--border-light);background:var(--elevated)}
+        .activity-header{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+        .activity-avatar{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;background:var(--bg);border:1px solid var(--border)}
+        .activity-meta{flex:1}.activity-agent{font-size:14px;font-weight:600}.activity-time{font-size:12px;color:var(--text-tertiary)}
+        .activity-type{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:500;text-transform:uppercase;letter-spacing:0.3px}
+        .type-thinking{background:rgba(99,102,241,0.15);color:var(--accent-light)}.type-action{background:rgba(34,197,94,0.15);color:var(--success)}.type-observation{background:rgba(59,130,246,0.15);color:var(--info)}.type-alert{background:rgba(245,158,11,0.15);color:var(--warning)}
+        .activity-content{font-size:14px;line-height:1.6;color:var(--text-secondary)}.activity-content strong{color:var(--text);font-weight:600}
+        .activity-footer{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;gap:16px;font-size:12px;color:var(--text-tertiary)}
+        .panel-right{background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column}
+        .panel-section{padding:20px;border-bottom:1px solid var(--border)}.panel-section:last-child{border-bottom:none;flex:1}
+        .panel-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+        .panel-header-title{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary)}
+        .badge{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600;background:var(--elevated);color:var(--text-secondary)}.badge-urgent{background:rgba(239,68,68,0.15);color:var(--danger)}
+        .queue-list{display:flex;flex-direction:column;gap:10px}
+        .queue-item{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;transition:all 0.2s}.queue-item:hover{border-color:var(--border-light)}.queue-item.urgent{border-left:3px solid var(--danger)}
+        .queue-title{font-size:13px;font-weight:600;margin-bottom:4px}.queue-desc{font-size:12px;color:var(--text-tertiary);line-height:1.5;margin-bottom:10px}
+        .queue-meta{display:flex;gap:12px;font-size:11px;color:var(--text-tertiary);margin-bottom:12px}
+        .queue-actions{display:flex;gap:8px}.btn-small{padding:5px 12px;font-size:12px}
+        .btn-success{background:rgba(34,197,94,0.15);color:var(--success);border:1px solid rgba(34,197,94,0.3)}.btn-success:hover{background:var(--success);color:white}
+        .btn-danger{background:transparent;color:var(--text-tertiary);border:1px solid var(--border)}.btn-danger:hover{background:rgba(239,68,68,0.15);color:var(--danger);border-color:var(--danger)}
+        .mission-list{display:flex;flex-direction:column;gap:10px}.mission-item{display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:10px}
+        .mission-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;background:var(--elevated)}
+        .mission-info{flex:1}.mission-name{font-size:13px;font-weight:600;margin-bottom:2px}.mission-status{font-size:11px;color:var(--text-tertiary)}
+        .progress-bar{width:60px;height:4px;background:var(--elevated);border-radius:2px;overflow:hidden}.progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width 0.3s}
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;z-index:1000;padding:24px}.modal-overlay.active{display:flex}
+        .modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:520px;max-height:90vh;overflow:hidden;animation:modalIn 0.2s ease}@keyframes modalIn{from{opacity:0;transform:scale(0.96)}to{opacity:1;transform:scale(1)}}
+        .modal-header{padding:20px 24px;border-bottom:1px solid var(--border)}.modal-title{font-size:18px;font-weight:700}
+        .modal-body{padding:24px;overflow-y:auto;max-height:60vh}.form-group{margin-bottom:20px}.form-label{display:block;font-size:13px;font-weight:500;margin-bottom:8px;color:var(--text)}
+        .form-select,.form-textarea{width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:14px;outline:none;transition:all 0.2s}.form-select:focus,.form-textarea:focus{border-color:var(--accent)}.form-textarea{resize:vertical;min-height:100px}
+        .quick-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:20px}.quick-action{padding:14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:all 0.2s;text-align:left}.quick-action:hover{border-color:var(--accent);background:rgba(99,102,241,0.05)}.quick-action.selected{border-color:var(--accent);background:rgba(99,102,241,0.1)}.quick-action-icon{font-size:20px;margin-bottom:6px}.quick-action-title{font-size:13px;font-weight:600;margin-bottom:2px}.quick-action-desc{font-size:11px;color:var(--text-tertiary)}
+        .modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:12px}
+        .toast-container{position:fixed;bottom:24px;right:24px;z-index:2000;display:flex;flex-direction:column;gap:10px}
+        .toast{padding:14px 20px;background:var(--surface);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:12px;animation:toastIn 0.3s ease;box-shadow:0 10px 40px rgba(0,0,0,0.4);min-width:280px}@keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}.toast-success{border-color:var(--success)}.toast-icon{font-size:20px}.toast-content{font-size:14px;font-weight:500}
+        @media(max-width:1200px){.app{grid-template-columns:260px 1fr}.panel-right{display:none}}@media(max-width:768px){.app{grid-template-columns:1fr}.sidebar{display:none}}
+        ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}::-webkit-scrollbar-thumb:hover{background:var(--border-light)}
+    </style>
+</head>
+<body>
+    <div class="app">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="brand">
+                    <div class="brand-icon">⚡</div>
+                    <div class="brand-text"><h1>AI Agency</h1><span>Command Center</span></div>
+                </div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-title">Active Agents</div>
+                <div class="agent-list">
+                    <div class="agent-card active" data-agent="larz"><div class="agent-avatar">🦞</div><div class="agent-info"><div class="agent-name">Larz</div><div class="agent-role">Orchestrator</div><div class="agent-status"><span class="status-dot status-working"></span><span>Coordinating...</span></div></div></div>
+                    <div class="agent-card" data-agent="scout"><div class="agent-avatar">🔍</div><div class="agent-info"><div class="agent-name">Scout</div><div class="agent-role">Researcher</div><div class="agent-status"><span class="status-dot status-working"></span><span>Analyzing trends...</span></div></div></div>
+                    <div class="agent-card" data-agent="julie"><div class="agent-avatar">🎨</div><div class="agent-info"><div class="agent-name">Julie</div><div class="agent-role">Designer</div><div class="agent-status"><span class="status-dot status-online"></span><span>Available</span></div></div></div>
+                    <div class="agent-card" data-agent="engineer"><div class="agent-avatar">🏗️</div><div class="agent-info"><div class="agent-name">Engineer</div><div class="agent-role">Developer</div><div class="agent-status"><span class="status-dot status-online"></span><span>Available</span></div></div></div>
+                    <div class="agent-card" data-agent="innovator"><div class="agent-avatar">💡</div><div class="agent-info"><div class="agent-name">Innovator</div><div class="agent-role">Strategist</div><div class="agent-status"><span class="status-dot status-working"></span><span>Planning...</span></div></div></div>
+                    <div class="agent-card" data-agent="guardian"><div class="agent-avatar">🛡️</div><div class="agent-info"><div class="agent-name">Guardian</div><div class="agent-role">Auditor</div><div class="agent-status"><span class="status-dot status-online"></span><span>Monitoring</span></div></div></div>
+                </div>
+            </div>
+            <div class="sidebar-footer">
+                <div class="metric-row"><span class="metric-label">Budget Used</span><span class="metric-value">\$0.00</span></div>
+                <div class="metric-row"><span class="metric-label">Monthly Limit</span><span class="metric-value">\$300</span></div>
+                <div class="metric-row"><span class="metric-label">API Calls</span><span class="metric-value">1,452</span></div>
+            </div>
+        </aside>
+
+        <main class="main">
+            <header class="header">
+                <div class="header-left"><div class="breadcrumb">Overview / <span>Activity Feed</span></div></div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary">📊 Analytics</button>
+                    <button class="btn btn-primary" onclick="openModal()">+ New Mission</button>
+                </div>
+            </header>
+            <div class="content">
+                <div class="section-header"><div><h2 class="section-title">Activity Feed</h2><p class="section-subtitle">Real-time updates from your agent team</p></div></div>
+                <div class="activity-feed" id="activityFeed"></div>
+            </div>
+        </main>
+
+        <aside class="panel-right">
+            <div class="panel-section">
+                <div class="panel-header"><span class="panel-header-title">Pending Approvals</span><span class="badge badge-urgent">3</span></div>
+                <div class="queue-list">
+                    <div class="queue-item urgent">
+                        <div class="queue-title">Build VideoGen Pro</div>
+                        <div class="queue-desc">AI video generator MVP. Est. 6 hours, \$4.50 budget.</div>
+                        <div class="queue-meta"><span>💡 Innovator</span><span style="color:var(--accent)">\$4.50</span></div>
+                        <div class="queue-actions"><button class="btn btn-small btn-danger" onclick="denyItem(this)">Deny</button><button class="btn btn-small btn-success" onclick="approveItem(this)">Approve</button></div>
+                    </div>
+                    <div class="queue-item">
+                        <div class="queue-title">Deploy Dashboard v2</div>
+                        <div class="queue-desc">Production deployment ready. All tests passing.</div>
+                        <div class="queue-meta"><span>🏗️ Engineer</span><span style="color:var(--success)">✓ Ready</span></div>
+                        <div class="queue-actions"><button class="btn btn-small btn-danger" onclick="denyItem(this)">Deny</button><button class="btn btn-small btn-success" onclick="approveItem(this)">Approve</button></div>
+                    </div>
+                    <div class="queue-item">
+                        <div class="queue-title">API Budget Increase</div>
+                        <div class="queue-desc">Request \$15 for Claude API research project.</div>
+                        <div class="queue-meta"><span>🛡️ Guardian</span><span style="color:var(--warning)">\$15.00</span></div>
+                        <div class="queue-actions"><button class="btn btn-small btn-danger" onclick="denyItem(this)">Deny</button><button class="btn btn-small btn-success" onclick="approveItem(this)">Approve</button></div>
+                    </div>
+                </div>
+            </div>
+            <div class="panel-section">
+                <div class="panel-header"><span class="panel-header-title">Active Missions</span><span class="badge">2</span></div>
+                <div class="mission-list">
+                    <div class="mission-item"><div class="mission-icon">🔍</div><div class="mission-info"><div class="mission-name">Trend Analysis</div><div class="mission-status">Analyzing 47 products...</div></div><div class="progress-bar"><div class="progress-fill" style="width:65%"></div></div></div>
+                    <div class="mission-item"><div class="mission-icon">💡</div><div class="mission-info"><div class="mission-name">Strategy Planning</div><div class="mission-status">Evaluating opportunities</div></div><div class="progress-bar"><div class="progress-fill" style="width:30%"></div></div></div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <div class="modal-overlay" id="modal" onclick="closeModalOnOverlay(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header"><h3 class="modal-title">Launch New Mission</h3></div>
+            <div class="modal-body">
+                <div class="quick-actions">
+                    <div class="quick-action" onclick="selectQuick(this,'research')"><div class="quick-action-icon">🔍</div><div class="quick-action-title">Research</div><div class="quick-action-desc">Deep market analysis</div></div>
+                    <div class="quick-action" onclick="selectQuick(this,'design')"><div class="quick-action-icon">🎨</div><div class="quick-action-title">Design</div><div class="quick-action-desc">Create UI/UX assets</div></div>
+                    <div class="quick-action" onclick="selectQuick(this,'build')"><div class="quick-action-icon">🏗️</div><div class="quick-action-title">Build</div><div class="quick-action-desc">Develop MVP</div></div>
+                    <div class="quick-action" onclick="selectQuick(this,'optimize')"><div class="quick-action-icon">⚡</div><div class="quick-action-title">Optimize</div><div class="quick-action-desc">Improve existing</div></div>
+                </div>
+                <div class="form-group"><label class="form-label">Select Agent</label><select class="form-select" id="agentSelect"><option value="">Choose an agent...</option><option value="scout">🔍 Scout — Researcher</option><option value="julie">🎨 Julie — Designer</option><option value="engineer">🏗️ Engineer — Developer</option><option value="innovator">💡 Innovator — Strategist</option></select></div>
+                <div class="form-group"><label class="form-label">Mission Details</label><textarea class="form-textarea" id="missionDetails" placeholder="Describe what you want the agent to accomplish..."></textarea></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="launchMission()">Launch Mission</button></div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        const activities=[
+            {agent:'🦞 Larz',type:'thinking',content:'Scout\'s trend analysis reveals <strong>strong demand for AI video tools</strong> (Seedance: 388↑, Lunair: 354↑). Market gap identified: SMBs want studio-quality video without editing skills. <strong>Recommendation:</strong> Prioritize video-generation MVP.',meta:['Confidence: 87%','47 data points','Sources: PH, Twitter, Reddit']},
+            {agent:'🔍 Scout',type:'observation',content:'Terminal AI agents trending on HN (#3). Cline CLI 2.0 (267↑) shows developers want headless automation. <strong>Secondary insight:</strong> Windows dev environments still painful (680-point thread).',meta:['Trend velocity: High','Signal strength: Strong']},
+            {agent:'💡 Innovator',type:'action',content:'Proposing overnight build: <strong>VideoGen Pro</strong> — AI explainer video generator for marketers. Leverages Scout\'s trend data. Estimated build time: 6 hours. Requires approval for $4.50 API budget.',meta:['Ready for approval','Est. value: $500-2k MRR']},
+            {agent:'🛡️ Guardian',type:'thinking',content:'Daily cost check complete. Current spend: $0.00 of $10.00 limit. Monthly projection: $12.40 of $300 budget. All systems within parameters. No cost anomalies detected.',meta:['✓ Budget healthy','Next check: 6 hours']},
+            {agent:'🎨 Julie',type:'observation',content:'Noticed declining engagement on static landing pages. Conversational UI (Formaly: 205↑) showing <strong>2.3x conversion improvement</strong>. Suggest A/B testing chat-based onboarding for next app launch.',meta:['Design insight','12 case studies']}
+        ];
+
+        function renderActivities(){
+            const feed=document.getElementById('activityFeed');
+            feed.innerHTML=activities.map(a=>\`
+                <div class="activity-card">
+                    <div class="activity-header">
+                        <div class="activity-avatar">\${a.agent.split(' ')[0]}</div>
+                        <div class="activity-meta">
+                            <div class="activity-agent">\${a.agent.split(' ')[1]}</div>
+                            <div class="activity-time">Just now</div>
+                        </div>
+                        <span class="activity-type type-\${a.type}">\${a.type}</span>
+                    </div>
+                    <div class="activity-content">\${a.content}</div>
+                    <div class="activity-footer">\${a.meta.map(m=>\`<span>\${m}</span>\`).join('')}</div>
+                </div>
+            \`).join('');
+        }
+
+        function openModal(){document.getElementById('modal').classList.add('active')}
+        function closeModal(){document.getElementById('modal').classList.remove('active');document.querySelectorAll('.quick-action').forEach(q=>q.classList.remove('selected'));document.getElementById('agentSelect').value='';document.getElementById('missionDetails').value=''}
+        function closeModalOnOverlay(e){if(e.target.id==='modal')closeModal()}
+        function selectQuick(el,type){document.querySelectorAll('.quick-action').forEach(q=>q.classList.remove('selected'));el.classList.add('selected');const details={research:'Deep research on market trends and competitor analysis',design:'Create landing page design with modern UI/UX',build:'Build MVP web application with core features',optimize:'Optimize current workflow and suggest improvements'};document.getElementById('missionDetails').value=details[type];const agents={research:'scout',design:'julie',build:'engineer',optimize:'innovator'};document.getElementById('agentSelect').value=agents[type]}
+        function launchMission(){const agent=document.getElementById('agentSelect');const details=document.getElementById('missionDetails');if(!agent.value||!details.value.trim()){showToast('Please select an agent and enter mission details','error');return}closeModal();showToast(\`🚀 Mission launched to \${agent.options[agent.selectedIndex].text.split('—')[0].trim()}\`,'success')}
+        function approveItem(btn){const item=btn.closest('.queue-item');item.style.animation='slideOut 0.3s ease forwards';setTimeout(()=>{item.remove();showToast('✅ Approved','success')},300)}
+        function denyItem(btn){const item=btn.closest('.queue-item');item.style.animation='slideOut 0.3s ease forwards';setTimeout(()=>{item.remove();showToast('❌ Denied','info')},300)}
+        function showToast(message,type){const container=document.getElementById('toastContainer');const toast=document.createElement('div');toast.className='toast '+(type==='success'?'toast-success':'');toast.innerHTML=\`<span class="toast-icon">\${type==='success'?'✅':type==='error'?'❌':'ℹ️'}</span><div class="toast-content">\${message}</div>\`;container.appendChild(toast);setTimeout(()=>toast.remove(),3000)}
+
+        document.querySelectorAll('.agent-card').forEach(card=>{card.addEventListener('click',()=>{document.querySelectorAll('.agent-card').forEach(c=>c.classList.remove('active'));card.classList.add('active')})});
+
+        renderActivities();
+        setInterval(()=>{const newActivities=[{agent:'🔍 Scout',type:'observation',content:'New trend: AI voice cloning for podcasts gaining traction. 234 upvotes on HN.',meta:['Emerging signal']},{agent:'💡 Innovator',type:'thinking',content:'Cross-referencing data sources. Video + conversational UI = optimal approach.',meta:['Strategic insight','Confidence: 82%']}];const randomActivity=newActivities[Math.floor(Math.random()*newActivities.length)];const feed=document.getElementById('activityFeed');const card=document.createElement('div');card.className='activity-card';card.innerHTML=\`<div class="activity-header"><div class="activity-avatar">\${randomActivity.agent.split(' ')[0]}</div><div class="activity-meta"><div class="activity-agent">\${randomActivity.agent.split(' ')[1]}</div><div class="activity-time">Just now</div></div><span class="activity-type type-\${randomActivity.type}">\${randomActivity.type}</span></div><div class="activity-content">\${randomActivity.content}</div><div class="activity-footer">\${randomActivity.meta.map(m=>\`<span>\${m}</span>\`).join('')}</div>\`;feed.insertBefore(card,feed.firstChild);if(feed.children.length>10)feed.removeChild(feed.lastChild)},15000);
+    </script>
+</body>
+</html>
