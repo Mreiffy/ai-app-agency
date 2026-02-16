@@ -1,0 +1,9 @@
+{
+  "id": "disp_1771217362874",
+  "agent": "scout",
+  "task": "research",
+  "details": "Test research task from API",
+  "status": "running",
+  "createdAt": "2026-02-16T04:49:22.874Z",
+  "output": null
+}
