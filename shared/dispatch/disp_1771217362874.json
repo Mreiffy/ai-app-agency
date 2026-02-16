@@ -3,7 +3,8 @@
   "agent": "scout",
   "task": "research",
   "details": "Test research task from API",
-  "status": "running",
+  "status": "completed",
   "createdAt": "2026-02-16T04:49:22.874Z",
-  "output": null
+  "output": null,
+  "completedAt": "2026-02-16T04:49:46.890Z"
 }

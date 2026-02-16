@@ -444,6 +444,71 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', agents: Object.keys(state.agents).length });
 });
 
+// Mark task complete (called by agents)
+app.post('/api/complete', (req, res) => {
+  const { dispatchId, output, agent } = req.body;
+  
+  if (!dispatchId) {
+    return res.status(400).json({ error: 'Missing dispatchId' });
+  }
+  
+  const dispatchFile = path.join(DISPATCH_PATH, `${dispatchId}.json`);
+  
+  try {
+    if (fs.existsSync(dispatchFile)) {
+      const dispatch = JSON.parse(fs.readFileSync(dispatchFile, 'utf8'));
+      dispatch.status = 'completed';
+      dispatch.completedAt = new Date().toISOString();
+      dispatch.output = output || null;
+      fs.writeFileSync(dispatchFile, JSON.stringify(dispatch, null, 2));
+      
+      // Update mission
+      const mission = state.missions.find(m => m.id === dispatchId);
+      if (mission) {
+        mission.status = 'completed';
+        mission.progress = 100;
+      }
+      
+      // Add activity
+      addActivity(agent || dispatch.agent, 'action', `Completed: ${dispatch.details}`, ['✓ Done']);
+      broadcast({ type: 'mission_complete', data: { id: dispatchId, agent: agent || dispatch.agent } });
+      
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ error: 'Dispatch not found' });
+    }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get task for agent (agent polls this)
+app.get('/api/agent-task/:agentId', (req, res) => {
+  const { agentId } = req.params;
+  
+  // Find pending task for this agent
+  const files = fs.readdirSync(DISPATCH_PATH).filter(f => f.endsWith('.json'));
+  
+  for (const file of files) {
+    const dispatchPath = path.join(DISPATCH_PATH, file);
+    const dispatch = JSON.parse(fs.readFileSync(dispatchPath, 'utf8'));
+    
+    if (dispatch.agent === agentId && dispatch.status === 'pending') {
+      // Mark as running
+      dispatch.status = 'running';
+      dispatch.startedAt = new Date().toISOString();
+      fs.writeFileSync(dispatchPath, JSON.stringify(dispatch, null, 2));
+      
+      return res.json({ 
+        hasTask: true, 
+        task: dispatch 
+      });
+    }
+  }
+  
+  res.json({ hasTask: false });
+});
+
 // Start
 const PORT = process.env.AGENCY_PORT || 3456;
 server.listen(PORT, '0.0.0.0', () => {
