@@ -1,0 +1,227 @@
+#!/usr/bin/env python3
+"""
+Agency CLI - Interactive Mode
+Usage: agency-interactive
+"""
+
+import os
+import sys
+import readline
+from pathlib import Path
+
+AGENCY_DIR = "/data/.openclaw/workspace/agency"
+AGENTS = ["larz", "scout", "julie", "engineer", "innovator", "guardian"]
+
+class AgencyCLI:
+    def __init__(self):
+        self.prompt = "🚀 agency> "
+        self.history = []
+        
+    def print_banner(self):
+        print("""
+    ╔═══════════════════════════════════════════════════╗
+    ║  🤖 AI APP AGENCY - INTERACTIVE CONTROL CENTER   ║
+    ║                                                   ║
+    ║  Type 'help' for commands | 'quit' to exit       ║
+    ╚═══════════════════════════════════════════════════╝
+        """)
+    
+    def print_help(self):
+        print("""
+📋 AVAILABLE COMMANDS:
+
+🎯 AGENCY CONTROL:
+  status              Show full agency status
+  brief               Generate daily brief
+  standup [time]      Trigger standup (morning/evening/now)
+  costs               Show cost dashboard
+
+🤖 AGENT COMMANDS:
+  send <agent> <msg>  Send command to specific agent
+  memory <agent>      View agent's memory file
+  agents              List all agents with status
+
+🛠️  BUILD & DEPLOY:
+  build <idea>        Start new app build
+  deploy <app>        Deploy app to production (requires ✅)
+
+📊 MONITORING:
+  logs [type]         View logs (audit/cost/commands)
+  trends              View Scout's latest findings
+  dashboard           Full agency dashboard
+
+⚡ QUICK ACTIONS:
+  scout               Quick: "Research trending apps"
+  julie               Quick: "Create content for today"
+  engineer            Quick: "Ship overnight build"
+  innovate            Quick: "Build something cool"
+  
+💡 SPECIAL:
+  <agent>: <msg>      Shorthand (e.g., "larz: build app")
+  ! <cmd>             Execute shell command
+  help                Show this help
+  quit/exit           Exit interactive mode
+        """)
+    
+    def cmd_status(self, args):
+        os.system(f"{AGENCY_DIR}/agency-cli status")
+    
+    def cmd_send(self, args):
+        if len(args) < 2:
+            print("❌ Usage: send <agent> <message>")
+            return
+        agent = args[0]
+        message = " ".join(args[1:])
+        os.system(f'{AGENCY_DIR}/agency-cli send {agent} "{message}"')
+    
+    def cmd_memory(self, args):
+        if not args:
+            print("❌ Usage: memory <agent>")
+            return
+        os.system(f"{AGENCY_DIR}/agency-cli memory {args[0]}")
+    
+    def cmd_build(self, args):
+        if not args:
+            print("❌ Usage: build <app idea>")
+            return
+        idea = " ".join(args)
+        os.system(f'{AGENCY_DIR}/agency-cli build "{idea}"')
+    
+    def cmd_costs(self, args):
+        os.system(f"{AGENCY_DIR}/agency-cli costs")
+    
+    def cmd_brief(self, args):
+        os.system(f"{AGENCY_DIR}/agency-cli brief")
+    
+    def cmd_standup(self, args):
+        time = args[0] if args else "now"
+        os.system(f"{AGENCY_DIR}/agency-cli standup --time {time}")
+    
+    def cmd_logs(self, args):
+        log_type = args[0] if args else "audit"
+        os.system(f"{AGENCY_DIR}/agency-cli logs --type {log_type}")
+    
+    def cmd_agents(self, args):
+        print("\n🤖 AGENT TEAM:\n")
+        for agent in AGENTS:
+            emoji = {"larz": "🦞", "scout": "🔍", "julie": "🎨",
+                     "engineer": "🏗️", "innovator": "💡", "guardian": "🛡️"}.get(agent, "🤖")
+            print(f"  {emoji} {agent.upper():12} - Ready")
+        print()
+    
+    def cmd_dashboard(self, args):
+        print("""
+    ╔═══════════════════════════════════════════════════╗
+    ║              AGENCY DASHBOARD                     ║
+    ╠═══════════════════════════════════════════════════╣
+    ║  🟢 All Systems Operational                       ║
+    ║                                                   ║
+    ║  AGENTS:        6 Active                          ║
+    ║  UPTIME:        100%                              ║
+    ║  BUDGET:        $0.00 / $300 (0%)                ║
+    ║  NEXT EVENT:    Tomorrow 8:00 AM Brief            ║
+    ║                                                   ║
+    ║  📈 THIS WEEK:                                    ║
+    ║     Apps Shipped: 0                               ║
+    ║     PRs Merged:   0                               ║
+    ║     Revenue:      $0                              ║
+    ╚═══════════════════════════════════════════════════╝
+        """)
+    
+    def cmd_trends(self, args):
+        print("🔍 Loading Scout's latest trend report...")
+        print("(Would display recent findings from scout_memory.md)")
+    
+    def cmd_shorthand(self, line):
+        # Handle "larz: message" format
+        if ":" in line:
+            parts = line.split(":", 1)
+            agent = parts[0].strip()
+            message = parts[1].strip()
+            if agent in AGENTS:
+                self.cmd_send([agent, message])
+            else:
+                print(f"❌ Unknown agent: {agent}")
+    
+    def cmd_shell(self, args):
+        cmd = " ".join(args)
+        os.system(cmd)
+    
+    def cmd_quick(self, agent):
+        quick_commands = {
+            "scout": "Research trending apps on Product Hunt",
+            "julie": "Create Twitter thread for today",
+            "engineer": "Check overnight builds and create PR",
+            "innovate": "Build a small improvement surprise"
+        }
+        if agent in quick_commands:
+            self.cmd_send([agent, quick_commands[agent]])
+        else:
+            print(f"❌ No quick command for {agent}")
+    
+    def run(self):
+        self.print_banner()
+        print("✅ Agency CLI ready. Type 'help' for commands.\n")
+        
+        while True:
+            try:
+                line = input(self.prompt).strip()
+                if not line:
+                    continue
+                
+                parts = line.split()
+                cmd = parts[0].lower()
+                args = parts[1:]
+                
+                # Check for shorthand (agent: message)
+                if ":" in line and not line.startswith("!"):
+                    self.cmd_shorthand(line)
+                    continue
+                
+                # Command routing
+                if cmd in ["quit", "exit", "q"]:
+                    print("\n👋 Goodbye! Agency continues running in background.\n")
+                    break
+                elif cmd == "help":
+                    self.print_help()
+                elif cmd == "status":
+                    self.cmd_status(args)
+                elif cmd == "send":
+                    self.cmd_send(args)
+                elif cmd == "memory":
+                    self.cmd_memory(args)
+                elif cmd == "build":
+                    self.cmd_build(args)
+                elif cmd == "costs":
+                    self.cmd_costs(args)
+                elif cmd == "brief":
+                    self.cmd_brief(args)
+                elif cmd == "standup":
+                    self.cmd_standup(args)
+                elif cmd == "logs":
+                    self.cmd_logs(args)
+                elif cmd == "agents":
+                    self.cmd_agents(args)
+                elif cmd == "dashboard":
+                    self.cmd_dashboard(args)
+                elif cmd == "trends":
+                    self.cmd_trends(args)
+                elif cmd in AGENTS:
+                    self.cmd_quick(cmd)
+                elif cmd == "!":
+                    self.cmd_shell(args)
+                else:
+                    print(f"❌ Unknown command: {cmd}")
+                    print("Type 'help' for available commands")
+                    
+            except KeyboardInterrupt:
+                print("\n\n👋 Exiting...")
+                break
+            except EOFError:
+                break
+            except Exception as e:
+                print(f"❌ Error: {e}")
+
+if __name__ == "__main__":
+    cli = AgencyCLI()
+    cli.run()

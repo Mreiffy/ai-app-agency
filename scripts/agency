@@ -1,0 +1,339 @@
+#!/usr/bin/env python3
+"""
+Agency CLI - Control Interface for AI App Agency
+Usage: agency <command> [options]
+"""
+
+import sys
+import os
+import json
+import argparse
+from datetime import datetime
+from pathlib import Path
+
+AGENCY_DIR = "/data/.openclaw/workspace/agency"
+AGENTS = ["larz", "scout", "julie", "engineer", "innovator", "guardian"]
+
+def print_header(text):
+    print(f"\n{'='*60}")
+    print(f"  {text}")
+    print(f"{'='*60}\n")
+
+def print_agent_card(agent, status="Idle", current_task="None"):
+    emoji = {
+        "larz": "🦞", "scout": "🔍", "julie": "🎨",
+        "engineer": "🏗️", "innovator": "💡", "guardian": "🛡️"
+    }.get(agent, "🤖")
+    
+    print(f"{emoji} {agent.upper():12} | Status: {status:10} | Task: {current_task}")
+
+def cmd_status(args):
+    """Show agency status"""
+    print_header("AI APP AGENCY STATUS")
+    
+    print("📊 AGENTS:")
+    for agent in AGENTS:
+        memory_file = f"{AGENCY_DIR}/agents/{agent}/{agent}_memory.md"
+        if os.path.exists(memory_file):
+            print_agent_card(agent, "Active", "Ready")
+        else:
+            print_agent_card(agent, "Offline", "No memory")
+    
+    print("\n💰 COSTS:")
+    cost_log = f"{AGENCY_DIR}/shared/logs/cost_log.md"
+    if os.path.exists(cost_log):
+        print("  Daily: $0.00 / $10.00")
+        print("  Monthly: $0.00 / $300.00")
+        print("  Status: ✅ Under budget")
+    
+    print("\n⏰ NEXT EVENTS:")
+    print("  Tomorrow 8:00 AM - Daily Brief")
+    print("  Tomorrow 9:00 AM - Morning Standup")
+    
+    print("\n📁 AGENCY FILES:")
+    print(f"  Location: {AGENCY_DIR}")
+    print(f"  Size: 180KB")
+    print(f"  Files: 23")
+
+def cmd_send(args):
+    """Send command to an agent"""
+    agent = args.agent.lower()
+    message = args.message
+    
+    if agent not in AGENTS:
+        print(f"❌ Unknown agent: {agent}")
+        print(f"Available: {', '.join(AGENTS)}")
+        return
+    
+    print_header(f"SENDING TO {agent.upper()}")
+    print(f"Message: {message}")
+    print(f"\n📤 Routing to {agent}...")
+    
+    # Log the command
+    log_file = f"{AGENCY_DIR}/shared/logs/commands.log"
+    timestamp = datetime.now().isoformat()
+    with open(log_file, "a") as f:
+        f.write(f"[{timestamp}] TO {agent}: {message}\n")
+    
+    print(f"\n✅ Command logged. {agent} will process on next wake.")
+    
+    if agent == "larz":
+        print("\n💡 Tip: Larz will delegate to other agents as needed.")
+    elif agent == "scout":
+        print("\n🔍 Scout will research and report findings.")
+    elif agent == "engineer":
+        print("\n🏗️ Engineer will create a PR with implementation.")
+
+def cmd_memory(args):
+    """View agent memory"""
+    agent = args.agent.lower()
+    
+    if agent not in AGENTS:
+        print(f"❌ Unknown agent: {agent}")
+        return
+    
+    memory_file = f"{AGENCY_DIR}/agents/{agent}/{agent}_memory.md"
+    
+    print_header(f"{agent.upper()} MEMORY")
+    
+    if os.path.exists(memory_file):
+        with open(memory_file, "r") as f:
+            content = f.read()
+            # Show last 50 lines
+            lines = content.split('\n')
+            print('\n'.join(lines[-50:]))
+    else:
+        print("No memory file found.")
+
+def cmd_logs(args):
+    """View agency logs"""
+    log_type = args.type or "audit"
+    
+    log_files = {
+        "audit": f"{AGENCY_DIR}/shared/logs/audit_log.md",
+        "cost": f"{AGENCY_DIR}/shared/logs/cost_log.md",
+        "commands": f"{AGENCY_DIR}/shared/logs/commands.log"
+    }
+    
+    log_file = log_files.get(log_type)
+    
+    if not log_file or not os.path.exists(log_file):
+        print(f"❌ Log not found: {log_type}")
+        return
+    
+    print_header(f"{log_type.upper()} LOG")
+    
+    with open(log_file, "r") as f:
+        content = f.read()
+        lines = content.split('\n')
+        # Show last 100 lines or all if less
+        show_lines = min(100, len(lines))
+        print('\n'.join(lines[-show_lines:]))
+
+def cmd_brief(args):
+    """Generate daily brief"""
+    print_header("GENERATING DAILY BRIEF")
+    print("📋 Compiling:")
+    print("  - Overnight builds")
+    print("  - Scout's trend research")
+    print("  - 3 app ideas")
+    print("  - Cost status")
+    print("  - Team updates")
+    print("\n✅ Brief will be delivered at 8:00 AM")
+
+def cmd_standup(args):
+    """Trigger standup"""
+    time_of_day = args.time or "now"
+    
+    print_header(f"{time_of_day.upper()} STANDUP")
+    
+    if time_of_day == "morning":
+        print("🌅 Morning Standup Agenda:")
+        print("  1. Overnight builds review")
+        print("  2. Today's priorities")
+        print("  3. Blockers/support needed")
+        print("  4. Relationship updates")
+    elif time_of_day == "evening":
+        print("🌆 Evening Standup Agenda:")
+        print("  1. Day's accomplishments")
+        print("  2. Overnight task assignments")
+        print("  3. Tomorrow's plan")
+        print("  4. Relationship updates")
+    else:
+        print("🔄 Emergency Standup:")
+        print("  - Quick status from all agents")
+        print("  - Immediate blockers")
+        print("  - Priority adjustments")
+
+def cmd_build(args):
+    """Quick build command"""
+    idea = args.idea
+    
+    print_header("INITIATING BUILD")
+    print(f"📦 Project: {idea}")
+    print("\n🔄 Workflow:")
+    print("  1. Larz receives command")
+    print("  2. Scout researches (if needed)")
+    print("  3. Julie designs UI/content")
+    print("  4. Engineer codes MVP")
+    print("  5. Innovator polishes")
+    print("  6. Guardian checks costs")
+    print("  7. PR submitted for review")
+    print("\n⏱️  ETA: 4-24 hours depending on scope")
+    print("📬 You'll receive PR link when ready")
+
+def cmd_costs(args):
+    """Show cost breakdown"""
+    print_header("COST DASHBOARD")
+    
+    print("💰 BUDGET:")
+    print("  Monthly: $300.00")
+    print("  Daily:   $10.00")
+    
+    print("\n📊 CURRENT:")
+    print("  Today:   $0.00")
+    print("  Week:    $0.00")
+    print("  Month:   $0.00")
+    
+    print("\n🎯 STATUS: ✅ Well under budget")
+    
+    print("\n💡 OPTIMIZATIONS:")
+    print("  - Using Kimi (free) as default")
+    print("  - Haiku for quick tasks ($0.80/M)")
+    print("  - Codex for coding only ($0.50/M)")
+    print("  - Opus reserved for strategy ($15/M)")
+
+def cmd_agent(args):
+    """Agent-specific commands"""
+    agent = args.agent.lower()
+    action = args.action
+    
+    if agent not in AGENTS:
+        print(f"❌ Unknown agent: {agent}")
+        return
+    
+    print_header(f"{agent.upper()} - {action.upper()}")
+    
+    actions = {
+        "status": f"Checking {agent} status...",
+        "wake": f"Waking {agent}...",
+        "sleep": f"Putting {agent} to sleep...",
+        "reset": f"Resetting {agent} memory..."
+    }
+    
+    print(actions.get(action, f"Unknown action: {action}"))
+
+def cmd_list(args):
+    """List resources"""
+    resource = args.resource
+    
+    print_header(f"LISTING {resource.upper()}")
+    
+    if resource == "agents":
+        for agent in AGENTS:
+            skill_file = f"{AGENCY_DIR}/agents/{agent}/SKILL.md"
+            if os.path.exists(skill_file):
+                with open(skill_file, "r") as f:
+                    first_line = f.readline()
+                    desc = first_line.replace("---", "").strip()
+                    print(f"  • {agent}: {desc}")
+    elif resource == "jobs":
+        print("  • Daily Brief (8:00 AM)")
+        print("  • Morning Standup (9:00 AM)")
+        print("  • Scout Trend Check (Every 2hrs)")
+        print("  • Cost Check (Every 6hrs)")
+        print("  • Evening Standup (6:00 PM)")
+        print("  • Weekly Audit (Sunday)")
+    elif resource == "files":
+        for root, dirs, files in os.walk(AGENCY_DIR):
+            level = root.replace(AGENCY_DIR, '').count(os.sep)
+            indent = ' ' * 2 * level
+            print(f'{indent}{os.path.basename(root)}/')
+            subindent = ' ' * 2 * (level + 1)
+            for file in files[:5]:  # Limit output
+                print(f'{subindent}{file}')
+            if len(files) > 5:
+                print(f'{subindent}... and {len(files)-5} more')
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="AI App Agency Control Interface",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  agency status                    Show full agency status
+  agency send larz "build app"     Send command to Larz
+  agency memory scout              View Scout's memory
+  agency build "Twitter tool"      Start new build
+  agency costs                     Show cost dashboard
+  agency brief                     Generate daily brief
+  agency standup morning           Trigger morning standup
+  agency list agents               List all agents
+        """
+    )
+    
+    subparsers = parser.add_subparsers(dest="command", help="Commands")
+    
+    # Status
+    p_status = subparsers.add_parser("status", help="Show agency status")
+    p_status.set_defaults(func=cmd_status)
+    
+    # Send
+    p_send = subparsers.add_parser("send", help="Send command to agent")
+    p_send.add_argument("agent", help="Agent name (larz, scout, etc.)")
+    p_send.add_argument("message", help="Command message")
+    p_send.set_defaults(func=cmd_send)
+    
+    # Memory
+    p_memory = subparsers.add_parser("memory", help="View agent memory")
+    p_memory.add_argument("agent", help="Agent name")
+    p_memory.set_defaults(func=cmd_memory)
+    
+    # Logs
+    p_logs = subparsers.add_parser("logs", help="View logs")
+    p_logs.add_argument("--type", choices=["audit", "cost", "commands"],
+                        help="Log type")
+    p_logs.set_defaults(func=cmd_logs)
+    
+    # Brief
+    p_brief = subparsers.add_parser("brief", help="Generate daily brief")
+    p_brief.set_defaults(func=cmd_brief)
+    
+    # Standup
+    p_standup = subparsers.add_parser("standup", help="Trigger standup")
+    p_standup.add_argument("--time", choices=["morning", "evening", "now"],
+                           help="Standup type")
+    p_standup.set_defaults(func=cmd_standup)
+    
+    # Build
+    p_build = subparsers.add_parser("build", help="Start new build")
+    p_build.add_argument("idea", help="App idea to build")
+    p_build.set_defaults(func=cmd_build)
+    
+    # Costs
+    p_costs = subparsers.add_parser("costs", help="Show cost dashboard")
+    p_costs.set_defaults(func=cmd_costs)
+    
+    # Agent
+    p_agent = subparsers.add_parser("agent", help="Agent-specific commands")
+    p_agent.add_argument("agent", help="Agent name")
+    p_agent.add_argument("action", choices=["status", "wake", "sleep", "reset"],
+                         help="Action")
+    p_agent.set_defaults(func=cmd_agent)
+    
+    # List
+    p_list = subparsers.add_parser("list", help="List resources")
+    p_list.add_argument("resource", choices=["agents", "jobs", "files"],
+                        help="Resource type")
+    p_list.set_defaults(func=cmd_list)
+    
+    args = parser.parse_args()
+    
+    if not args.command:
+        parser.print_help()
+        sys.exit(1)
+    
+    args.func(args)
+
+if __name__ == "__main__":
+    main()

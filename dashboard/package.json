@@ -1,0 +1,15 @@
+{
+  "name": "ai-app-agency-dashboard",
+  "version": "1.0.0",
+  "description": "AI App Agency - Software Factory Dashboard",
+  "scripts": {
+    "start": "serve -s . -p $PORT",
+    "dev": "serve -s . -p 3000"
+  },
+  "dependencies": {
+    "serve": "^14.2.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

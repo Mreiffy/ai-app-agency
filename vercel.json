@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "name": "ai-app-agency",
+  "builds": [
+    {
+      "src": "dashboard/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/dashboard/$1"
+    }
+  ],
+  "github": {
+    "enabled": true
+  }
+}

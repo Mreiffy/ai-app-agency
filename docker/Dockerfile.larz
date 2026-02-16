@@ -1,0 +1,25 @@
+FROM node:20-slim
+
+WORKDIR /app
+
+# Install Python for script execution
+RUN apt-get update && apt-get install -y python3 python3-pip git curl
+
+# Copy agent configuration
+COPY ./agents/larz/ ./larz/
+COPY ./shared/ ./shared/
+COPY ./scripts/ ./scripts/
+
+# Install global tools
+RUN npm install -g @anthropic-ai/claude-code @anthropic-ai/codex
+
+# Environment setup
+ENV AGENT_ROLE=larz
+ENV NODE_ENV=production
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3000/health || exit 1
+
+# Run Larz orchestrator
+CMD ["node", "scripts/orchestrator.js"]

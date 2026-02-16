@@ -1,0 +1,75 @@
+#!/bin/bash
+# Agency CLI - Bash wrapper for common commands
+# Usage: agency <command> [args]
+
+AGENCY_DIR="/data/.openclaw/workspace/agency"
+PYTHON_SCRIPT="$AGENCY_DIR/scripts/agency"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+print_banner() {
+    echo -e "${BLUE}"
+    echo "    ╔═══════════════════════════════════════╗"
+    echo "    ║     🤖 AI APP AGENCY CONTROL       ║"
+    echo "    ╚═══════════════════════════════════════╝"
+    echo -e "${NC}"
+}
+
+show_help() {
+    print_banner
+    echo "Usage: agency <command> [options]"
+    echo ""
+    echo "Commands:"
+    echo "  status              Show full agency status"
+    echo "  send <agent> <msg>  Send command to agent"
+    echo "  memory <agent>      View agent memory"
+    echo "  logs [--type]       View logs (audit/cost/commands)"
+    echo "  brief               Generate daily brief"
+    echo "  standup [time]      Trigger standup (morning/evening/now)"
+    echo "  build <idea>        Start new build"
+    echo "  costs               Show cost dashboard"
+    echo "  list <resource>     List agents/jobs/files"
+    echo "  help                Show this help"
+    echo ""
+    echo "Agents: larz, scout, julie, engineer, innovator, guardian"
+    echo ""
+    echo "Examples:"
+    echo "  agency status"
+    echo "  agency send larz 'build Twitter growth tool'"
+    echo "  agency memory scout"
+    echo "  agency build 'SaaS boilerplate generator'"
+    echo "  agency costs"
+}
+
+# If no args, show help
+if [ $# -eq 0 ]; then
+    show_help
+    exit 0
+fi
+
+COMMAND=$1
+shift
+
+case $COMMAND in
+    status|send|memory|logs|brief|standup|build|costs|agent|list)
+        python3 $PYTHON_SCRIPT $COMMAND "$@"
+        ;;
+    help|--help|-h)
+        show_help
+        ;;
+    # Quick shortcuts
+    larz|scout|julie|engineer|innovator|guardian)
+        echo -e "${YELLOW}Quick command to $COMMAND${NC}"
+        echo "Use: agency send $COMMAND '<message>'"
+        ;;
+    *)
+        echo -e "${RED}Unknown command: $COMMAND${NC}"
+        echo "Run 'agency help' for usage"
+        exit 1
+        ;;
+esac

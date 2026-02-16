@@ -1,0 +1,70 @@
+#!/bin/bash
+# Agency Dashboard Launcher
+# Usage: agency-dashboard [command]
+
+DASHBOARD_DIR="/data/.openclaw/workspace/agency/dashboard"
+PID_FILE="/tmp/agency-dashboard.pid"
+
+case "$1" in
+    start)
+        if [ -f "$PID_FILE" ] && kill -0 $(cat "$PID_FILE") 2>/dev/null; then
+            echo "🏭 Dashboard already running on http://localhost:8080"
+            exit 0
+        fi
+        
+        echo "🏭 Starting AI App Agency Dashboard..."
+        cd "$DASHBOARD_DIR"
+        python3 -m http.server 8080 > /tmp/dashboard.log 2>&1 &
+        echo $! > "$PID_FILE"
+        
+        sleep 2
+        
+        echo ""
+        echo "✅ Dashboard started!"
+        echo "🌐 URL: http://localhost:8080"
+        echo ""
+        echo "To view:"
+        echo "  - Local: http://localhost:8080"
+        echo "  - Network: http://$(hostname -I | awk '{print $1}'):8080"
+        ;;
+    
+    stop)
+        if [ -f "$PID_FILE" ]; then
+            kill $(cat "$PID_FILE") 2>/dev/null && echo "✅ Dashboard stopped"
+            rm -f "$PID_FILE"
+        else
+            echo "❌ Dashboard not running"
+        fi
+        ;;
+    
+    status)
+        if [ -f "$PID_FILE" ] && kill -0 $(cat "$PID_FILE") 2>/dev/null; then
+            echo "🏭 Dashboard is running"
+            echo "🌐 http://localhost:8080"
+        else
+            echo "❌ Dashboard is stopped"
+        fi
+        ;;
+    
+    open)
+        if command -v xdg-open > /dev/null; then
+            xdg-open http://localhost:8080
+        elif command -v open > /dev/null; then
+            open http://localhost:8080
+        else
+            echo "👉 Open http://localhost:8080 manually"
+        fi
+        ;;
+    
+    *)
+        echo "🏭 AI App Agency Dashboard"
+        echo ""
+        echo "Usage: agency-dashboard [start|stop|status|open]"
+        echo ""
+        echo "Commands:"
+        echo "  start   Start the dashboard server"
+        echo "  stop    Stop the dashboard server"
+        echo "  status  Check if dashboard is running"
+        echo "  open    Open dashboard in browser"
+        ;;
+esac

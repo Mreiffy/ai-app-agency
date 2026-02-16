@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI App Agency - Software Factory Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-dark: #0a0a0f; --bg-panel: #12121a; --bg-card: #1a1a25;
+            --accent-cyan: #00f0ff; --accent-purple: #a855f7; --accent-green: #22c55e;
+            --text-primary: #ffffff; --text-secondary: #9ca3af; --border: #2a2a3a;
+        }
+        body {
+            font-family: 'SF Mono', Monaco, monospace;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+        .header {
+            padding: 20px 30px;
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .logo { display: flex; align-items: center; gap: 15px; }
+        .logo h1 {
+            font-size: 24px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .container {
+            padding: 30px;
+            display: grid;
+            grid-template-columns: 300px 1fr 350px;
+            gap: 25px;
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+        .panel {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+        .panel-header {
+            padding: 15px 20px;
+            background: rgba(255,255,255,0.02);
+            border-bottom: 1px solid var(--border);
+        }
+        .panel-header h3 {
+            font-size: 14px; text-transform: uppercase; letter-spacing: 1px;
+            color: var(--text-secondary);
+        }
+        .panel-content { padding: 20px; }
+        .agent-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .agent-card:hover {
+            border-color: var(--accent-cyan);
+            transform: translateX(5px);
+        }
+        .agent-header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+        .agent-avatar { font-size: 28px; }
+        .agent-info h4 { font-size: 16px; }
+        .agent-info .role { font-size: 12px; color: var(--text-secondary); }
+        .agent-status { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-top: 8px; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-green); animation: blink 2s infinite; }
+        @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .metric-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .metric-value { font-size: 28px; font-weight: 700; color: var(--accent-cyan); }
+        .metric-label { font-size: 12px; color: var(--text-secondary); text-transform: uppercase; }
+        .factory-visual {
+            height: 400px;
+            background: radial-gradient(ellipse at center, rgba(0,240,255,0.05) 0%, transparent 70%);
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            position: relative;
+        }
+        .conveyor-belt {
+            position: absolute;
+            bottom: 80px;
+            left: 50px; right: 50px;
+            height: 60px;
+            border-top: 2px dashed rgba(0,240,255,0.3);
+            border-bottom: 2px dashed rgba(0,240,255,0.3);
+        }
+        .work-station {
+            position: absolute;
+            text-align: center;
+        }
+        .station-icon { font-size: 40px; margin-bottom: 10px; }
+        .station-label { font-size: 12px; color: var(--text-secondary); text-transform: uppercase; }
+        .activity-item {
+            padding: 12px;
+            border-left: 3px solid var(--accent-cyan);
+            margin-bottom: 10px;
+            background: rgba(0,240,255,0.03);
+            border-radius: 0 8px 8px 0;
+            font-size: 13px;
+        }
+        .activity-time { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
+        .activity-agent { font-weight: 600; color: var(--accent-cyan); }
+        .terminal {
+            background: #0c0c14;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            height: 200px;
+            overflow-y: auto;
+        }
+        .progress-bar {
+            height: 8px;
+            background: var(--bg-card);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple));
+            border-radius: 4px;
+            transition: width 0.5s;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">
+            <div style="font-size: 32px;">🏭</div>
+            <div>
+                <h1>AI APP AGENCY</h1>
+                <span style="color: var(--text-secondary); font-size: 14px;">Software Factory Dashboard</span>
+            </div>
+        </div>
+        <div style="display: flex; gap: 30px;">
+            <div style="text-align: center;"><div style="font-size: 11px; color: var(--text-secondary);">STATUS</div><div style="color: var(--accent-green); font-weight: 700;">ONLINE</div></div>
+            <div style="text-align: center;"><div style="font-size: 11px; color: var(--text-secondary);">AGENTS</div><div style="color: var(--accent-cyan); font-weight: 700;">6 Active</div></div>
+            <div style="text-align: center;"><div style="font-size: 11px; color: var(--text-secondary);">COST TODAY</div><div style="color: var(--accent-green); font-weight: 700;">$0.00</div></div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Left Panel - Agents -->
+        <div>
+            <div class="panel">
+                <div class="panel-header"><h3>Active Agents</h3></div>
+                <div class="panel-content">
+                    <div class="agent-card">
+                        <div class="agent-header">
+                            <div class="agent-avatar">🦞</div>
+                            <div class="agent-info">
+                                <h4>Larz</h4>
+                                <div class="role">Chief Orchestrator</div>
+                            </div>
+                        </div>
+                        <div class="agent-status"><span class="status-dot"></span><span>Online - Managing operations</span></div>
+                    </div>
+                    <div class="agent-card">
+                        <div class="agent-header">
+                            <div class="agent-avatar">🔍</div>
+                            <div class="agent-info">
+                                <h4>Scout</h4>
+                                <div class="role">Researcher</div>
+                            </div>
+                        </div>
+                        <div class="agent-status"><span class="status-dot"></span><span>Scanning X/Reddit...</span></div>
+                    </div>
+                    <div class="agent-card">
+                        <div class="agent-header">
+                            <div class="agent-avatar">🎨</div>
+                            <div class="agent-info">
+                                <h4>Julie</h4>
+                                <div class="role">Content & Design</div>
+                            </div>
+                        </div>
+                        <div class="agent-status"><span class="status-dot"></span><span>Ready for creative tasks</span></div>
+                    </div>
+                    <div class="agent-card">
+                        <div class="agent-header">
+                            <div class="agent-avatar">🏗️</div>
+                            <div class="agent-info">
+                                <h4>Engineer</h4>
+                                <div class="role">Full-Stack Dev</div>
+                            </div>
+                        </div>
+                        <div class="agent-status"><span class="status-dot"></span><span>Ready for builds</span></div>
+                    </div>
+                    <div class="agent-card">
+                        <div class="agent-header">
+                            <div class="agent-avatar">💡</div>
+                            <div class="agent-info">
+                                <h4>Innovator</h4>
+                                <div class="role">Proactive Improver</div>
+                            </div>
+                        </div>
+                        <div class="agent-status"><span class="status-dot"></span><span>Planning overnight build</span></div>
+                    </div>
+                    <div class="agent-card">
+                        <div class="agent-header">
+                            <div class="agent-avatar">🛡️</div>
+                            <div class="agent-info">
+                                <h4>Guardian</h4>
+                                <div class="role">Cost & Safety</div>
+                            </div>
+                        </div>
+                        <div class="agent-status"><span class="status-dot"></span><span>Monitoring: $0/$10 ✅</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel" style="margin-top: 20px;">
+                <div class="panel-header"><h3>Quick Stats</h3></div>
+                <div class="panel-content">
+                    <div class="metric-card"><div class="metric-value">0</div><div class="metric-label">Apps Shipped</div></div>
+                    <div class="metric-card"><div class="metric-value">$0</div><div class="metric-label">Revenue</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center - Factory Floor -->
+        <div class="panel">
+            <div class="panel-header"><h3>Software Factory Floor</h3></div>
+            <div class="panel-content">
+                <div class="factory-visual">
+                    <div class="work-station" style="top: 50px; left: 50px;">
+                        <div class="station-icon">🔍</div>
+                        <div class="station-label">Trend Research</div>
+                    </div>
+                    <div class="work-station" style="top: 50px; left: 50%; transform: translateX(-50%);">
+                        <div class="station-icon">🎨</div>
+                        <div class="station-label">Design Studio</div>
+                    </div>
+                    <div class="work-station" style="top: 50px; right: 50px;">
+                        <div class="station-icon">🏗️</div>
+                        <div class="station-label">Build Station</div>
+                    </div>
+                    <div class="conveyor-belt"></div>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <div style="margin-bottom: 10px; font-size: 12px; color: var(--text-secondary); text-transform: uppercase;">Live Terminal</div>
+                    <div class="terminal">
+                        <div style="color: var(--accent-green);">$ agency status</div>
+                        <div style="color: var(--text-secondary); margin: 5px 0;">
+                            ✅ All systems operational<br>
+                            🦞 Larz: Online<br>
+                            🔍 Scout: Monitoring trends...<br>
+                            🎨 Julie: Ready<br>
+                            🏗️ Engineer: Ready<br>
+                            💡 Innovator: Planning build<br>
+                            🛡️ Guardian: Cost monitoring
+                        </div>
+                        <div style="color: var(--accent-cyan);">$ <span style="animation: blink 1s infinite;">_</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel - Activity -->
+        <div>
+            <div class="panel">
+                <div class="panel-header"><h3>Live Activity</h3></div>
+                <div class="panel-content" id="activityStream">
+                    <div class="activity-item">
+                        <div class="activity-time">21:18:45</div>
+                        <div><span class="activity-agent">Larz</span> created Dashboard UI</div>
+                    </div>
+                    <div class="activity-item">
+                        <div class="activity-time">21:15:32</div>
+                        <div><span class="activity-agent">Larz</span> initialized Agency CLI</div>
+                    </div>
+                    <div class="activity-item">
+                        <div class="activity-time">21:10:45</div>
+                        <div><span class="activity-agent">Larz</span> completed agency setup</div>
+                    </div>
+                    <div class="activity-item">
+                        <div class="activity-time">21:02:00</div>
+                        <div><span class="activity-agent">Scout</span> started 24/7 monitoring</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel" style="margin-top: 20px;">
+                <div class="panel-header"><h3>Operations Progress</h3></div>
+                <div class="panel-content">
+                    <div>Agency Initialization</div>
+                    <div class="progress-bar"><div class="progress-fill" style="width: 100%;"></div></div>
+                    <div>Agent Setup</div>
+                    <div class="progress-bar"><div class="progress-fill" style="width: 100%;"></div></div>
+                    <div>Dashboard UI</div>
+                    <div class="progress-bar"><div class="progress-fill" style="width: 100%;"></div></div>
+                </div>
+            </div>
+
+            <div class="panel" style="margin-top: 20px;">
+                <div class="panel-header"><h3>Next Events</h3></div>
+                <div class="panel-content" style="font-size: 13px; line-height: 2;">
+                    <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-secondary);">Tomorrow 8:00 AM</span><span style="color: var(--accent-cyan);">Daily Brief</span></div>
+                    <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-secondary);">Tomorrow 9:00 AM</span><span style="color: var(--accent-cyan);">Morning Standup</span></div>
+                    <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-secondary);">Every 2 hours</span><span style="color: var(--accent-cyan);">Scout Trends</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const activities = [
+            { agent: 'Scout', action: 'Found trending topic' },
+            { agent: 'Guardian', action: 'Completed cost audit' },
+            { agent: 'Innovator', action: 'Planning overnight build' },
+            { agent: 'Julie', action: 'Analyzing content trends' },
+            { agent: 'Engineer', action: 'Reviewing PR templates' },
+            { agent: 'Larz', action: 'Coordinating team priorities' },
+        ];
+
+        function addActivity() {
+            const stream = document.getElementById('activityStream');
+            const activity = activities[Math.floor(Math.random() * activities.length)];
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+            
+            const item = document.createElement('div');
+            item.className = 'activity-item';
+            item.innerHTML = `<div class="activity-time">${time}</div><div><span class="activity-agent">${activity.agent}</span> ${activity.action}</div>`;
+            stream.insertBefore(item, stream.firstChild);
+            while (stream.children.length > 20) stream.removeChild(stream.lastChild);
+        }
+
+        setInterval(addActivity, 8000);
+    </script>
+</body>
+</html>
