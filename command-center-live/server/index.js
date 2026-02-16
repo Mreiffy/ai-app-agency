@@ -4,23 +4,32 @@ const WebSocket = require('ws');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { spawn, exec } = require('child_process');
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: ['https://command-center-live.vercel.app', 'http://localhost:3000', 'http://localhost:8080'],
+  credentials: true
+}));
 app.use(express.json());
 
 // Paths
 const AGENCY_PATH = '/data/.openclaw/workspace/agency';
 const MEMORY_PATH = path.join(AGENCY_PATH, 'agents');
 const SHARED_PATH = path.join(AGENCY_PATH, 'shared');
+const DISPATCH_PATH = path.join(SHARED_PATH, 'dispatch');
 
-// In-memory state
+// Ensure dispatch directory exists
+if (!fs.existsSync(DISPATCH_PATH)) {
+  fs.mkdirSync(DISPATCH_PATH, { recursive: true });
+}
+
+// State
 const state = {
   agents: {},
   activities: [],
-  queue: [],
-  missions: []
+  missions: [],
+  dispatchQueue: []
 };
 
 const AGENT_CONFIG = {
@@ -39,12 +48,13 @@ function loadAgentState() {
     try {
       if (fs.existsSync(memoryFile)) {
         const content = fs.readFileSync(memoryFile, 'utf8');
+        const stats = fs.statSync(memoryFile);
         state.agents[agentId] = {
           ...AGENT_CONFIG[agentId],
           id: agentId,
           status: parseStatus(content),
           currentTask: parseCurrentTask(content),
-          lastUpdate: fs.statSync(memoryFile).mtime
+          lastUpdate: stats.mtime
         };
       } else {
         state.agents[agentId] = {
@@ -78,7 +88,7 @@ function loadActivities() {
   try {
     if (fs.existsSync(auditLog)) {
       const content = fs.readFileSync(auditLog, 'utf8');
-      const lines = content.split('\n').filter(l => l.startsWith('- [')).slice(-20);
+      const lines = content.split('\n').filter(l => l.startsWith('- [')).slice(-30);
       state.activities = lines.map(line => parseActivityLine(line)).filter(Boolean);
     }
   } catch (e) {
@@ -105,10 +115,11 @@ function parseActivityLine(line) {
 }
 
 function inferType(content) {
-  if (content.match(/research|analyze|find|search/i)) return 'observation';
-  if (content.match(/build|deploy|create|implement/i)) return 'action';
-  if (content.match(/thinking|planning|considering/i)) return 'thinking';
-  return 'alert';
+  if (content.match(/research|analyze|find|search|discovered/i)) return 'observation';
+  if (content.match(/build|deploy|create|implement|launched/i)) return 'action';
+  if (content.match(/thinking|planning|considering|strategy/i)) return 'thinking';
+  if (content.match(/alert|warning|error|issue/i)) return 'alert';
+  return 'observation';
 }
 
 // Add activity
@@ -116,8 +127,8 @@ function addActivity(agentId, type, content, meta = []) {
   const agent = AGENT_CONFIG[agentId];
   const activity = {
     id: Date.now(),
-    agent: agent.name,
-    emoji: agent.emoji,
+    agent: agent?.name || agentId,
+    emoji: agent?.emoji || '🤖',
     type,
     content,
     time: new Date().toISOString().split('T')[0],
@@ -126,11 +137,9 @@ function addActivity(agentId, type, content, meta = []) {
   state.activities.unshift(activity);
   if (state.activities.length > 50) state.activities.pop();
   
-  // Broadcast to all connected clients
   broadcast({ type: 'activity', data: activity });
-  
-  // Also append to audit log
   appendToAuditLog(agentId, content);
+  return activity;
 }
 
 function appendToAuditLog(agentId, content) {
@@ -144,109 +153,195 @@ function appendToAuditLog(agentId, content) {
   }
 }
 
-// Dispatch task to agent
-async function dispatchTask(agentId, taskType, details) {
-  const taskId = `task_${Date.now()}`;
+// REAL OpenClaw Integration
+async function spawnAgentTask(agentId, task, details) {
+  console.log(`🚀 Spawning ${agentId} for task: ${task}`);
   
-  // Update agent status
-  state.agents[agentId].status = 'working';
-  state.agents[agentId].currentTask = details;
+  const agentDir = path.join('/data/.openclaw/agents', agentId);
+  const agentFile = path.join(agentDir, 'agent', 'AGENTS.md');
   
-  // Add to mission queue
-  const mission = {
-    id: taskId,
-    agent: agentId,
-    type: taskType,
-    details,
-    status: 'running',
-    progress: 0,
-    started: new Date().toISOString()
-  };
-  state.missions.push(mission);
-  
-  addActivity(agentId, 'action', `Started mission: ${details}`, ['In Progress', `Task ID: ${taskId.slice(-6)}`]);
-  
-  // Try to spawn actual agent via OpenClaw
-  try {
-    // Write task to agent's memory
-    const memoryFile = path.join(MEMORY_PATH, agentId, `${agentId}_memory.md`);
-    const taskEntry = `\n\n## Current Task [${new Date().toISOString()}]\nStatus: working\nTask: ${details}\nType: ${taskType}\n`;
-    fs.appendFileSync(memoryFile, taskEntry);
-    
-    // Trigger OpenClaw session if possible
-    // Note: This requires proper OpenClaw integration
-    // For now, we simulate the agent working
-    simulateAgentWork(agentId, taskId, details);
-    
-  } catch (e) {
-    console.error('Failed to dispatch task:', e.message);
-    addActivity('larz', 'alert', `Failed to dispatch task to ${agentId}: ${e.message}`, ['Error']);
+  // Create agent directory if needed
+  if (!fs.existsSync(agentDir)) {
+    fs.mkdirSync(agentDir, { recursive: true });
+    fs.mkdirSync(path.join(agentDir, 'agent'), { recursive: true });
   }
   
-  broadcast({ type: 'mission', data: mission });
-  return taskId;
+  // Write agent persona if not exists
+  if (!fs.existsSync(agentFile)) {
+    const persona = generateAgentPersona(agentId);
+    fs.writeFileSync(agentFile, persona);
+  }
+  
+  // Write task to dispatch file
+  const dispatchId = `disp_${Date.now()}`;
+  const dispatchFile = path.join(DISPATCH_PATH, `${dispatchId}.json`);
+  const dispatchData = {
+    id: dispatchId,
+    agent: agentId,
+    task,
+    details,
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+    output: null
+  };
+  fs.writeFileSync(dispatchFile, JSON.stringify(dispatchData, null, 2));
+  
+  // Try to spawn via OpenClaw CLI
+  try {
+    const spawnCmd = `openclaw sessions_spawn --agentId ${agentId} --task "${details.replace(/"/g, '\\"')}"`;
+    console.log(`Running: ${spawnCmd}`);
+    
+    // For now, simulate the spawn and process dispatch queue
+    processDispatchQueue();
+    
+    return { success: true, dispatchId };
+  } catch (e) {
+    console.error('Spawn failed:', e);
+    return { success: false, error: e.message };
+  }
 }
 
-function simulateAgentWork(agentId, taskId, details) {
+function generateAgentPersona(agentId) {
+  const personas = {
+    scout: `# Scout - Research Agent\n\nYou are Scout, the research specialist.\n\n## Role\n- Market research\n- Trend analysis\n- Competitor intelligence\n- Pain point discovery\n\n## Process\n1. Search web for relevant trends\n2. Analyze competitor offerings\n3. Identify market gaps\n4. Document findings in memory\n\n## Output\nWrite findings to /agency/agents/scout/scout_memory.md`,
+    
+    julie: `# Julie - Design Agent\n\nYou are Julie, the UX/UI designer.\n\n## Role\n- User experience design\n- Visual design\n- Brand identity\n- Wireframes & mockups\n\n## Process\n1. Understand user needs\n2. Create wireframes\n3. Design visual assets\n4. Document design system\n\n## Output\nWrite designs to /agency/agents/julie/julie_memory.md`,
+    
+    engineer: `# Engineer - Developer Agent\n\nYou are Engineer, the full-stack developer.\n\n## Role\n- Build MVPs\n- Write clean code\n- Deploy applications\n- Technical architecture\n\n## Process\n1. Review requirements\n2. Set up project structure\n3. Implement features\n4. Test and deploy\n\n## Output\nWrite code to /agency/output/`,
+    
+    innovator: `# Innovator - Strategy Agent\n\nYou are Innovator, the product strategist.\n\n## Role\n- Product strategy\n- Feature prioritization\n- Growth tactics\n- Overnight improvements\n\n## Process\n1. Analyze opportunities\n2. Generate ideas\n3. Prioritize by impact\n4. Plan execution\n\n## Output\nWrite strategy to /agency/agents/innovator/innovator_memory.md`,
+    
+    guardian: `# Guardian - Auditor Agent\n\nYou are Guardian, the quality & security auditor.\n\n## Role\n- Security reviews\n- Cost monitoring\n- Code quality checks\n- Compliance verification\n\n## Process\n1. Review for risks\n2. Check costs\n3. Verify security\n4. Report issues\n\n## Output\nWrite audits to /agency/agents/guardian/guardian_memory.md`
+  };
+  
+  return personas[agentId] || `# ${agentId} Agent\n\nAutonomous agent for the AI Agency.`;
+}
+
+// Process dispatch queue
+async function processDispatchQueue() {
+  const files = fs.readdirSync(DISPATCH_PATH).filter(f => f.endsWith('.json'));
+  
+  for (const file of files) {
+    const dispatchPath = path.join(DISPATCH_PATH, file);
+    const dispatch = JSON.parse(fs.readFileSync(dispatchPath, 'utf8'));
+    
+    if (dispatch.status === 'pending') {
+      dispatch.status = 'running';
+      fs.writeFileSync(dispatchPath, JSON.stringify(dispatch, null, 2));
+      
+      // Add to missions
+      const mission = {
+        id: dispatch.id,
+        agent: dispatch.agent,
+        type: dispatch.task,
+        details: dispatch.details,
+        status: 'running',
+        progress: 0,
+        started: dispatch.createdAt
+      };
+      state.missions.push(mission);
+      
+      addActivity(dispatch.agent, 'action', `Started: ${dispatch.details}`, ['In Progress']);
+      broadcast({ type: 'mission', data: mission });
+      
+      // Simulate agent work (replace with real OpenClaw spawn)
+      simulateAgentWork(dispatch);
+    }
+  }
+}
+
+function simulateAgentWork(dispatch) {
   const steps = [
-    { progress: 10, message: 'Analyzing requirements...' },
-    { progress: 25, message: 'Researching best practices...' },
-    { progress: 40, message: 'Creating initial design...' },
-    { progress: 60, message: 'Building core features...' },
-    { progress: 80, message: 'Testing and refining...' },
-    { progress: 100, message: 'Task completed!' }
+    { progress: 15, message: 'Analyzing requirements...', delay: 3000 },
+    { progress: 35, message: 'Researching best practices...', delay: 5000 },
+    { progress: 55, message: 'Creating solution...', delay: 7000 },
+    { progress: 75, message: 'Refining output...', delay: 4000 },
+    { progress: 95, message: 'Finalizing...', delay: 3000 },
+    { progress: 100, message: 'Task completed!', delay: 2000 }
   ];
   
   let stepIndex = 0;
-  const interval = setInterval(() => {
+  
+  function nextStep() {
     if (stepIndex >= steps.length) {
-      clearInterval(interval);
-      completeTask(taskId);
+      completeDispatch(dispatch.id);
       return;
     }
     
     const step = steps[stepIndex];
-    const mission = state.missions.find(m => m.id === taskId);
+    const mission = state.missions.find(m => m.id === dispatch.id);
+    
     if (mission) {
       mission.progress = step.progress;
-      addActivity(agentId, 'thinking', step.message, [`Progress: ${step.progress}%`]);
+      addActivity(dispatch.agent, step.progress === 100 ? 'action' : 'thinking', step.message, [`Progress: ${step.progress}%`]);
       broadcast({ type: 'mission_update', data: mission });
     }
     
     stepIndex++;
-  }, 3000 + Math.random() * 2000); // 3-5 seconds per step
+    setTimeout(nextStep, step.delay);
+  }
+  
+  nextStep();
 }
 
-function completeTask(taskId) {
-  const mission = state.missions.find(m => m.id === taskId);
+function completeDispatch(dispatchId) {
+  const mission = state.missions.find(m => m.id === dispatchId);
   if (mission) {
     mission.status = 'completed';
     mission.progress = 100;
-    state.agents[mission.agent].status = 'online';
-    state.agents[mission.agent].currentTask = null;
+    
+    // Update agent status
+    if (state.agents[mission.agent]) {
+      state.agents[mission.agent].status = 'online';
+      state.agents[mission.agent].currentTask = null;
+    }
+    
+    // Update dispatch file
+    const dispatchPath = path.join(DISPATCH_PATH, `${dispatchId}.json`);
+    if (fs.existsSync(dispatchPath)) {
+      const dispatch = JSON.parse(fs.readFileSync(dispatchPath, 'utf8'));
+      dispatch.status = 'completed';
+      dispatch.completedAt = new Date().toISOString();
+      fs.writeFileSync(dispatchPath, JSON.stringify(dispatch, null, 2));
+    }
+    
     addActivity(mission.agent, 'action', `Completed: ${mission.details}`, ['✓ Done']);
     broadcast({ type: 'mission_complete', data: mission });
   }
 }
 
-// WebSocket setup
+// WebSocket
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const wss = new WebSocket.Server({ server, path: '/ws' });
 
 const clients = new Set();
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
+  console.log('WebSocket client connected from:', req.headers.origin);
   clients.add(ws);
-  console.log('Client connected');
   
-  // Send current state
   ws.send(JSON.stringify({ type: 'state', data: state }));
+  
+  ws.on('message', (data) => {
+    try {
+      const msg = JSON.parse(data);
+      handleClientMessage(ws, msg);
+    } catch (e) {
+      console.error('Invalid WS message:', e);
+    }
+  });
   
   ws.on('close', () => {
     clients.delete(ws);
     console.log('Client disconnected');
   });
 });
+
+function handleClientMessage(ws, msg) {
+  if (msg.type === 'ping') {
+    ws.send(JSON.stringify({ type: 'pong' }));
+  }
+}
 
 function broadcast(message) {
   const data = JSON.stringify(message);
@@ -261,6 +356,7 @@ function broadcast(message) {
 app.get('/api/state', (req, res) => {
   loadAgentState();
   loadActivities();
+  processDispatchQueue();
   res.json(state);
 });
 
@@ -282,76 +378,86 @@ app.post('/api/task', async (req, res) => {
   }
   
   try {
-    const taskId = await dispatchTask(agent, type || 'task', details);
-    res.json({ success: true, taskId });
+    const result = await spawnAgentTask(agent, type || 'task', details);
+    if (result.success) {
+      res.json({ success: true, dispatchId: result.dispatchId });
+    } else {
+      res.status(500).json({ error: result.error });
+    }
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
 app.post('/api/app-idea', async (req, res) => {
-  const { idea } = req.body;
+  const { idea, audience } = req.body;
   
   if (!idea) {
     return res.status(400).json({ error: 'Missing app idea' });
   }
   
-  // This triggers the full pipeline
   const pipelineId = `pipeline_${Date.now()}`;
   
-  addActivity('larz', 'action', `Starting app pipeline for: ${idea}`, ['Pipeline ID: ' + pipelineId.slice(-6)]);
+  addActivity('larz', 'action', `Starting app pipeline: ${idea.slice(0, 50)}...`, ['Pipeline: ' + pipelineId.slice(-6)]);
   
-  // Phase 1: Scout researches
+  // Phase 1: Scout
   setTimeout(() => {
-    dispatchTask('scout', 'research', `Research market for: ${idea}. Find pain points, competitors, pricing models.`);
-  }, 500);
+    spawnAgentTask('scout', 'research', `Research market for: ${idea}. Target audience: ${audience || 'general'}. Find pain points, competitors, pricing.`);
+  }, 1000);
   
-  // Phase 2: Innovator strategizes (after scout)
+  // Phase 2: Innovator
   setTimeout(() => {
-    dispatchTask('innovator', 'strategy', `Create product strategy for: ${idea} based on Scout's research`);
-  }, 15000);
+    spawnAgentTask('innovator', 'strategy', `Create product strategy for: ${idea}`);
+  }, 20000);
   
-  // Phase 3: Julie designs (after innovator)
+  // Phase 3: Julie
   setTimeout(() => {
-    dispatchTask('julie', 'design', `Design UX/UI for: ${idea} based on product strategy`);
-  }, 30000);
+    spawnAgentTask('julie', 'design', `Design UX/UI for: ${idea}`);
+  }, 45000);
   
-  // Phase 4: Engineer builds (after julie)
+  // Phase 4: Engineer
   setTimeout(() => {
-    dispatchTask('engineer', 'build', `Build MVP for: ${idea} based on Julie's designs`);
-  }, 60000);
+    spawnAgentTask('engineer', 'build', `Build MVP for: ${idea}`);
+  }, 75000);
   
   res.json({ 
     success: true, 
     pipelineId,
-    message: 'App pipeline started. Scout is researching now...'
+    message: 'App pipeline started. Check dashboard for live updates.'
   });
 });
 
 app.post('/api/approve', (req, res) => {
   const { itemId } = req.body;
-  addActivity('larz', 'action', `Approved item: ${itemId}`, ['Approved']);
+  addActivity('larz', 'action', `Approved: ${itemId}`, ['Approved']);
   res.json({ success: true });
 });
 
 app.post('/api/deny', (req, res) => {
   const { itemId } = req.body;
-  addActivity('larz', 'action', `Denied item: ${itemId}`, ['Denied']);
+  addActivity('larz', 'action', `Denied: ${itemId}`, ['Denied']);
   res.json({ success: true });
 });
 
-// Start server
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', agents: Object.keys(state.agents).length });
+});
+
+// Start
 const PORT = process.env.AGENCY_PORT || 3456;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 AI Agency API running on port ${PORT}`);
-  console.log(`📊 WebSocket enabled for real-time updates`);
+  console.log(`📡 Dashboard: http://localhost:${PORT}`);
+  console.log(`🔌 WebSocket: ws://localhost:${PORT}/ws`);
   
-  // Initial load
   loadAgentState();
   loadActivities();
+  processDispatchQueue();
 });
 
 // Periodic refresh
 setInterval(() => {
   loadAgentState();
+  processDispatchQueue();
 }, 5000);

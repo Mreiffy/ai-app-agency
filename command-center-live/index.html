@@ -174,39 +174,69 @@
 
     <script>
         const API_URL = 'http://157.230.5.64:3456';
-        const WS_URL = 'ws://157.230.5.64:3456';
+        const WS_URL = 'ws://157.230.5.64:3456/ws';
         
-        let ws, reconnectInterval;
+        let ws, reconnectTimer, heartbeatTimer;
+        let reconnectAttempts = 0;
         let state = { agents: {}, activities: [], missions: [] };
 
         function connect() {
+            if (ws?.readyState === WebSocket.OPEN) return;
+            
+            console.log('Connecting to AI Agency...');
             ws = new WebSocket(WS_URL);
             
             ws.onopen = () => {
-                console.log('Connected to AI Agency');
+                console.log('✅ Connected to AI Agency');
                 updateConnection(true);
-                clearInterval(reconnectInterval);
+                reconnectAttempts = 0;
+                clearTimeout(reconnectTimer);
+                
+                // Start heartbeat
+                heartbeatTimer = setInterval(() => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: 'ping' }));
+                    }
+                }, 30000);
+                
+                // Fetch initial state
+                fetchState();
             };
             
             ws.onmessage = (event) => {
-                const msg = JSON.parse(event.data);
-                handleMessage(msg);
+                try {
+                    const msg = JSON.parse(event.data);
+                    handleMessage(msg);
+                } catch (e) {
+                    console.error('Invalid message:', e);
+                }
             };
             
-            ws.onclose = () => {
-                console.log('Disconnected');
+            ws.onclose = (e) => {
+                console.log('Disconnected:', e.code, e.reason);
                 updateConnection(false);
-                reconnectInterval = setInterval(connect, 3000);
+                clearInterval(heartbeatTimer);
+                
+                // Exponential backoff
+                const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+                reconnectAttempts++;
+                reconnectTimer = setTimeout(connect, delay);
             };
             
             ws.onerror = (err) => {
                 console.error('WebSocket error:', err);
+                ws.close();
             };
         }
 
         function updateConnection(connected) {
-            document.getElementById('connDot').className = 'conn-dot' + (connected ? '' : ' offline');
-            document.getElementById('connText').textContent = connected ? 'Live Connected' : 'Reconnecting...';
+            const dot = document.getElementById('connDot');
+            const text = document.getElementById('connText');
+            if (!dot || !text) return;
+            
+            dot.className = 'conn-dot' + (connected ? '' : ' offline');
+            text.textContent = connected ? '● Live' : '○ Offline';
+            text.style.color = connected ? 'var(--success)' : 'var(--danger)';
         }
 
         function handleMessage(msg) {
@@ -224,11 +254,17 @@
 
         async function fetchState() {
             try {
-                const res = await fetch(`${API_URL}/api/state`);
-                state = await res.json();
+                const res = await fetch(`${API_URL}/api/state`, {
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const newState = await res.json();
+                state = newState;
                 renderAll();
+                updateConnection(true);
             } catch (e) {
-                console.error('Failed to fetch state:', e);
+                console.error('Failed to fetch state:', e.message);
+                updateConnection(false);
             }
         }
 
@@ -369,6 +405,7 @@
             if (!agent || !details.trim()) { showToast('Please select an agent and enter details', 'error'); return; }
             
             const btn = document.getElementById('launchBtn');
+            const originalText = btn.innerHTML;
             btn.innerHTML = 'Launching<span class="loading"></span>';
             btn.disabled = true;
             
@@ -380,13 +417,14 @@
                 });
                 const data = await res.json();
                 if (data.success) {
-                    showToast(`🚀 Task launched to ${agent}`, 'success');
+                    showToast(`🚀 Task launched to ${agent}! Check activity feed.`, 'success');
                     closeTaskModal();
+                    fetchState(); // Refresh immediately
                 } else throw new Error(data.error);
             } catch (e) {
-                showToast('Failed to launch: ' + e.message, 'error');
+                showToast('Failed: ' + e.message, 'error');
             } finally {
-                btn.innerHTML = 'Launch';
+                btn.innerHTML = originalText;
                 btn.disabled = false;
             }
         }
@@ -396,6 +434,7 @@
             if (!idea.trim()) { showToast('Please enter an app idea', 'error'); return; }
             
             const btn = document.getElementById('pipelineBtn');
+            const originalText = btn.innerHTML;
             btn.innerHTML = 'Starting...<span class="loading"></span>';
             btn.disabled = true;
             
@@ -407,13 +446,14 @@
                 });
                 const data = await res.json();
                 if (data.success) {
-                    showToast('🚀 App pipeline started! Scout is researching...', 'success');
+                    showToast('🚀 Pipeline started! Watch the activity feed...', 'success');
                     closeAppIdeaModal();
+                    fetchState();
                 } else throw new Error(data.error);
             } catch (e) {
                 showToast('Failed: ' + e.message, 'error');
             } finally {
-                btn.innerHTML = 'Start Pipeline';
+                btn.innerHTML = originalText;
                 btn.disabled = false;
             }
         }
