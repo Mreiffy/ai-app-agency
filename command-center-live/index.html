@@ -173,8 +173,8 @@
     <div class="toast-container" id="toastContainer"></div>
 
     <script>
-        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : '';
-        const WS_URL = window.location.hostname === 'localhost' ? 'ws://localhost:3000' : `wss://${window.location.host}`;
+        const API_URL = 'http://157.230.5.64:3456';
+        const WS_URL = 'ws://157.230.5.64:3456';
         
         let ws, reconnectInterval;
         let state = { agents: {}, activities: [], missions: [] };

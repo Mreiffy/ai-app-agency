@@ -341,8 +341,8 @@ app.post('/api/deny', (req, res) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
+const PORT = process.env.AGENCY_PORT || 3456;
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 AI Agency API running on port ${PORT}`);
   console.log(`📊 WebSocket enabled for real-time updates`);
   
