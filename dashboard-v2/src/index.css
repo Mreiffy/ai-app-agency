@@ -1,0 +1,180 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --neon-cyan: #00f0ff;
+  --neon-purple: #a855f7;
+  --neon-green: #22c55e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-cyber-black text-white font-sans antialiased;
+  background-image: 
+    radial-gradient(ellipse at 20% 20%, rgba(168, 85, 247, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(0, 240, 255, 0.05) 0%, transparent 50%),
+    linear-gradient(rgba(0, 240, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.015) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-cyber-dark;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-cyber-border rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-neon-cyan/30;
+}
+
+/* Glass Panel Effect */
+.glass-panel {
+  @apply bg-cyber-panel/80 backdrop-blur-xl border border-cyber-border/50;
+  box-shadow: 
+    0 4px 24px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Neon Glow Effects */
+.glow-cyan {
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.3), 0 0 40px rgba(0, 240, 255, 0.1);
+}
+
+.glow-purple {
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.3), 0 0 40px rgba(168, 85, 247, 0.1);
+}
+
+.glow-green {
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.3), 0 0 40px rgba(34, 197, 94, 0.1);
+}
+
+.text-glow-cyan {
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+}
+
+.text-glow-purple {
+  text-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
+}
+
+/* Status Indicators */
+.status-dot {
+  @apply w-2 h-2 rounded-full;
+}
+
+.status-online {
+  @apply bg-neon-green animate-pulse;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
+}
+
+.status-working {
+  @apply bg-neon-cyan animate-pulse;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.8);
+}
+
+.status-idle {
+  @apply bg-gray-500;
+}
+
+/* Terminal Effect */
+.terminal-cursor {
+  @apply inline-block w-2 h-4 bg-neon-cyan animate-pulse;
+}
+
+/* Gradient Text */
+.gradient-text {
+  @apply bg-gradient-to-r from-neon-cyan via-neon-purple to-neon-pink bg-clip-text text-transparent;
+}
+
+/* Button Styles */
+.btn-primary {
+  @apply px-4 py-2 bg-neon-cyan/10 border border-neon-cyan/50 text-neon-cyan rounded-lg 
+         hover:bg-neon-cyan/20 hover:border-neon-cyan transition-all duration-300
+         font-medium text-sm;
+}
+
+.btn-secondary {
+  @apply px-4 py-2 bg-cyber-card border border-cyber-border text-gray-300 rounded-lg 
+         hover:border-gray-500 hover:text-white transition-all duration-300
+         font-medium text-sm;
+}
+
+/* Card Hover Effects */
+.agent-card {
+  @apply glass-panel rounded-xl p-4 cursor-pointer transition-all duration-300;
+}
+
+.agent-card:hover {
+  @apply border-neon-cyan/30;
+  box-shadow: 0 0 30px rgba(0, 240, 255, 0.1);
+}
+
+.agent-card.active {
+  @apply border-neon-cyan/50 bg-neon-cyan/5;
+}
+
+/* Progress Bar */
+.progress-bar {
+  @apply h-1.5 bg-cyber-dark rounded-full overflow-hidden;
+}
+
+.progress-fill {
+  @apply h-full rounded-full bg-gradient-to-r from-neon-cyan to-neon-purple;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+}
+
+/* Code/Teletype Font */
+.font-mono {
+  font-feature-settings: 'liga' 0;
+}
+
+/* Animations */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Scanline Effect */
+.scanlines::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    transparent 50%,
+    rgba(0, 0, 0, 0.1) 50%
+  );
+  background-size: 100% 4px;
+  pointer-events: none;
+  z-index: 10;
+}
