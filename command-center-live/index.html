@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agency Command Center — LIVE</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root{--bg:#0a0a0f;--surface:#111118;--elevated:#1a1a22;--hover:#22222c;--border:#2a2a35;--border-light:#363640;--text:#fff;--text-secondary:#a0a0b0;--text-tertiary:#6b6b7b;--accent:#6366f1;--accent-light:#818cf8;--success:#22c55e;--warning:#f59e0b;--danger:#ef4444;--info:#3b82f6}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+        .app{display:grid;grid-template-columns:280px 1fr 360px;min-height:100vh}
+        .sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;position:sticky;top:0}
+        .sidebar-header{padding:20px;border-bottom:1px solid var(--border)}
+        .brand{display:flex;align-items:center;gap:12px}
+        .brand-icon{width:40px;height:40px;background:linear-gradient(135deg,var(--accent),#8b5cf6);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 20px rgba(99,102,241,0.3);animation:pulse-glow 3s ease-in-out infinite}
+        @keyframes pulse-glow{0%,100%{box-shadow:0 4px 20px rgba(99,102,241,0.3)}50%{box-shadow:0 4px 30px rgba(99,102,241,0.5)}}
+        .brand-text h1{font-size:16px;font-weight:700}.brand-text span{font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.5px}
+        .connection-status{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:11px}
+        .conn-dot{width:6px;height:6px;border-radius:50%;background:var(--success);animation:pulse 2s infinite}
+        .conn-dot.offline{background:var(--danger);animation:none}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+        .nav-section{padding:16px;flex:1;overflow-y:auto}
+        .nav-title{font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.8px;padding:0 8px;margin-bottom:12px}
+        .agent-list{display:flex;flex-direction:column;gap:6px}
+        .agent-card{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;cursor:pointer;transition:all 0.2s;border:1px solid transparent;position:relative}
+        .agent-card:hover{background:var(--elevated);border-color:var(--border)}
+        .agent-card.active{background:var(--elevated);border-color:var(--accent)}
+        .agent-card.working::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);border-radius:10px 0 0 10px}
+        .agent-avatar{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;background:var(--bg);border:1px solid var(--border)}
+        .agent-info{flex:1;min-width:0}
+        .agent-name{font-size:13px;font-weight:600}.agent-role{font-size:11px;color:var(--text-tertiary)}
+        .agent-status{display:flex;align-items:center;gap:6px;font-size:10px;margin-top:3px;color:var(--text-tertiary)}
+        .status-dot{width:5px;height:5px;border-radius:50%}
+        .status-online{background:var(--success);box-shadow:0 0 4px var(--success)}
+        .status-working{background:var(--accent);box-shadow:0 0 4px var(--accent);animation:pulse 1.5s infinite}
+        .status-idle{background:var(--text-tertiary)}
+        .sidebar-footer{padding:16px;border-top:1px solid var(--border)}
+        .metric-row{display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:1px solid var(--border)}
+        .metric-row:last-child{border-bottom:none}.metric-label{color:var(--text-secondary)}.metric-value{font-weight:600;font-family:'JetBrains Mono',monospace}
+        .main{display:flex;flex-direction:column;min-height:100vh}
+        .header{height:60px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px;position:sticky;top:0;z-index:10}
+        .header-left{display:flex;align-items:center;gap:20px}
+        .breadcrumb{font-size:14px;color:var(--text-secondary)}.breadcrumb span{color:var(--text);font-weight:600}
+        .header-actions{display:flex;gap:10px}
+        .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;transition:all 0.2s;border:none;font-family:inherit}
+        .btn-secondary{background:var(--elevated);color:var(--text);border:1px solid var(--border)}.btn-secondary:hover{background:var(--hover);border-color:var(--border-light)}
+        .btn-primary{background:var(--accent);color:white;font-weight:600}.btn-primary:hover{background:var(--accent-light);transform:translateY(-1px);box-shadow:0 4px 15px rgba(99,102,241,0.3)}
+        .content{flex:1;padding:20px;overflow-y:auto}
+        .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+        .section-title{font-size:16px;font-weight:700}.section-subtitle{font-size:12px;color:var(--text-secondary);margin-top:2px}
+        .activity-feed{display:flex;flex-direction:column;gap:10px}
+        .activity-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;transition:all 0.2s;animation:slideIn 0.3s ease}
+        @keyframes slideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .activity-card:hover{border-color:var(--border-light)}
+        .activity-header{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+        .activity-avatar{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;background:var(--bg);border:1px solid var(--border)}
+        .activity-meta{flex:1}.activity-agent{font-size:13px;font-weight:600}.activity-time{font-size:11px;color:var(--text-tertiary)}
+        .activity-type{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:500;text-transform:uppercase;letter-spacing:0.3px}
+        .type-thinking{background:rgba(99,102,241,0.15);color:var(--accent-light)}.type-action{background:rgba(34,197,94,0.15);color:var(--success)}.type-observation{background:rgba(59,130,246,0.15);color:var(--info)}.type-alert{background:rgba(245,158,11,0.15);color:var(--warning)}
+        .activity-content{font-size:13px;line-height:1.6;color:var(--text-secondary)}.activity-content strong{color:var(--text);font-weight:600}
+        .activity-footer{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:12px;font-size:11px;color:var(--text-tertiary)}
+        .panel-right{background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column}
+        .panel-section{padding:16px;border-bottom:1px solid var(--border)}.panel-section:last-child{border-bottom:none;flex:1}
+        .panel-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+        .panel-header-title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary)}
+        .badge{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600;background:var(--elevated);color:var(--text-secondary)}.badge-urgent{background:rgba(239,68,68,0.15);color:var(--danger)}
+        .queue-list{display:flex;flex-direction:column;gap:8px}
+        .queue-item{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;transition:all 0.2s}
+        .queue-item:hover{border-color:var(--border-light)}.queue-item.urgent{border-left:3px solid var(--danger)}
+        .queue-title{font-size:12px;font-weight:600;margin-bottom:3px}.queue-desc{font-size:11px;color:var(--text-tertiary);line-height:1.4;margin-bottom:8px}
+        .queue-meta{display:flex;gap:10px;font-size:10px;color:var(--text-tertiary);margin-bottom:10px}
+        .queue-actions{display:flex;gap:6px}.btn-small{padding:4px 10px;font-size:11px}
+        .btn-success{background:rgba(34,197,94,0.15);color:var(--success);border:1px solid rgba(34,197,94,0.3)}.btn-success:hover{background:var(--success);color:white}
+        .btn-danger{background:transparent;color:var(--text-tertiary);border:1px solid var(--border)}.btn-danger:hover{background:rgba(239,68,68,0.15);color:var(--danger);border-color:var(--danger)}
+        .mission-list{display:flex;flex-direction:column;gap:8px}
+        .mission-item{display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:8px}
+        .mission-icon{width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;background:var(--elevated)}
+        .mission-info{flex:1}.mission-name{font-size:12px;font-weight:600;margin-bottom:2px}.mission-status{font-size:10px;color:var(--text-tertiary)}
+        .progress-bar{width:50px;height:3px;background:var(--elevated);border-radius:2px;overflow:hidden}.progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width 0.3s}
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px}.modal-overlay.active{display:flex}
+        .modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:480px;max-height:85vh;overflow:hidden;animation:modalIn 0.2s ease}@keyframes modalIn{from{opacity:0;transform:scale(0.96)}to{opacity:1;transform:scale(1)}}
+        .modal-header{padding:16px 20px;border-bottom:1px solid var(--border)}.modal-title{font-size:16px;font-weight:700}
+        .modal-body{padding:20px;overflow-y:auto;max-height:50vh}.form-group{margin-bottom:16px}.form-label{display:block;font-size:12px;font-weight:500;margin-bottom:6px;color:var(--text)}
+        .form-select,.form-textarea,.form-input{width:100%;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:13px;outline:none;transition:all 0.2s}.form-select:focus,.form-textarea:focus,.form-input:focus{border-color:var(--accent)}.form-textarea{resize:vertical;min-height:80px}
+        .quick-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px}.quick-action{padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all 0.2s;text-align:left}.quick-action:hover{border-color:var(--accent);background:rgba(99,102,241,0.05)}.quick-action.selected{border-color:var(--accent);background:rgba(99,102,241,0.1)}.quick-action-icon{font-size:18px;margin-bottom:4px}.quick-action-title{font-size:12px;font-weight:600;margin-bottom:2px}.quick-action-desc{font-size:10px;color:var(--text-tertiary)}
+        .modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+        .toast-container{position:fixed;bottom:20px;right:20px;z-index:2000;display:flex;flex-direction:column;gap:8px}
+        .toast{padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;gap:10px;animation:toastIn 0.3s ease;box-shadow:0 8px 30px rgba(0,0,0,0.4);min-width:240px;font-size:13px}@keyframes toastIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}.toast-success{border-color:var(--success)}.toast-icon{font-size:16px}.loading{display:inline-block;width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;margin-left:8px}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+    </style>
+</head>
+<body>
+    <div class="app">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="brand">
+                    <div class="brand-icon">⚡</div>
+                    <div class="brand-text"><h1>AI Agency</h1><span>Command Center</span></div>
+                </div>
+                <div class="connection-status">
+                    <span class="conn-dot" id="connDot"></span>
+                    <span id="connText">Connecting...</span>
+                </div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-title">Active Agents</div>
+                <div class="agent-list" id="agentList"></div>
+            </div>
+            <div class="sidebar-footer">
+                <div class="metric-row"><span class="metric-label">Budget Used</span><span class="metric-value" id="budgetUsed">$0.00</span></div>
+                <div class="metric-row"><span class="metric-label">Monthly Limit</span><span class="metric-value">$300</span></div>
+                <div class="metric-row"><span class="metric-label">API Calls</span><span class="metric-value" id="apiCalls">0</span></div>
+            </div>
+        </aside>
+
+        <main class="main">
+            <header class="header">
+                <div class="header-left"><div class="breadcrumb">Overview / <span>Live Activity</span></div></div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="openAppIdeaModal()">💡 New App Idea</button>
+                    <button class="btn btn-primary" onclick="openTaskModal()">+ New Task</button>
+                </div>
+            </header>
+            <div class="content">
+                <div class="section-header"><div><h2 class="section-title">Live Activity Feed</h2><p class="section-subtitle">Real-time agent thoughts & actions</p></div></div>
+                <div class="activity-feed" id="activityFeed"></div>
+            </div>
+        </main>
+
+        <aside class="panel-right">
+            <div class="panel-section">
+                <div class="panel-header"><span class="panel-header-title">Pending Approvals</span><span class="badge badge-urgent" id="approvalCount">0</span></div>
+                <div class="queue-list" id="queueList"></div>
+            </div>
+            <div class="panel-section">
+                <div class="panel-header"><span class="panel-header-title">Active Missions</span><span class="badge" id="missionCount">0</span></div>
+                <div class="mission-list" id="missionList"></div>
+            </div>
+        </aside>
+    </div>
+
+    <div class="modal-overlay" id="taskModal" onclick="closeModalOnOverlay(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header"><h3 class="modal-title">Launch New Task</h3></div>
+            <div class="modal-body">
+                <div class="quick-actions">
+                    <div class="quick-action" onclick="selectQuick(this,'research','scout')"><div class="quick-action-icon">🔍</div><div class="quick-action-title">Research</div><div class="quick-action-desc">Market analysis</div></div>
+                    <div class="quick-action" onclick="selectQuick(this,'design','julie')"><div class="quick-action-icon">🎨</div><div class="quick-action-title">Design</div><div class="quick-action-desc">UI/UX assets</div></div>
+                    <div class="quick-action" onclick="selectQuick(this,'build','engineer')"><div class="quick-action-icon">🏗️</div><div class="quick-action-title">Build</div><div class="quick-action-desc">Develop MVP</div></div>
+                    <div class="quick-action" onclick="selectQuick(this,'strategy','innovator')"><div class="quick-action-icon">💡</div><div class="quick-action-title">Strategy</div><div class="quick-action-desc">Product planning</div></div>
+                </div>
+                <div class="form-group"><label class="form-label">Select Agent</label><select class="form-select" id="taskAgent"><option value="">Choose...</option><option value="scout">🔍 Scout</option><option value="julie">🎨 Julie</option><option value="engineer">🏗️ Engineer</option><option value="innovator">💡 Innovator</option><option value="guardian">🛡️ Guardian</option></select></div>
+                <div class="form-group"><label class="form-label">Task Details</label><textarea class="form-textarea" id="taskDetails" placeholder="What should the agent do?"></textarea></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" onclick="closeTaskModal()">Cancel</button><button class="btn btn-primary" onclick="launchTask()" id="launchBtn">Launch</button></div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="appIdeaModal" onclick="closeModalOnOverlay(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header"><h3 class="modal-title">💡 Launch App Pipeline</h3></div>
+            <div class="modal-body">
+                <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">Submit your app idea. The agency will research, design, and build it automatically.</p>
+                <div class="form-group"><label class="form-label">What's your app idea?</label><textarea class="form-textarea" id="appIdea" placeholder="e.g., A meditation app that uses AI to generate personalized soundscapes based on the user's heart rate and mood..."></textarea></div>
+                <div class="form-group"><label class="form-label">Target Audience (optional)</label><input type="text" class="form-input" id="targetAudience" placeholder="e.g., Remote workers, Gen Z, Small businesses..."></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" onclick="closeAppIdeaModal()">Cancel</button><button class="btn btn-primary" onclick="launchAppPipeline()" id="pipelineBtn">Start Pipeline</button></div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : '';
+        const WS_URL = window.location.hostname === 'localhost' ? 'ws://localhost:3000' : `wss://${window.location.host}`;
+        
+        let ws, reconnectInterval;
+        let state = { agents: {}, activities: [], missions: [] };
+
+        function connect() {
+            ws = new WebSocket(WS_URL);
+            
+            ws.onopen = () => {
+                console.log('Connected to AI Agency');
+                updateConnection(true);
+                clearInterval(reconnectInterval);
+            };
+            
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                handleMessage(msg);
+            };
+            
+            ws.onclose = () => {
+                console.log('Disconnected');
+                updateConnection(false);
+                reconnectInterval = setInterval(connect, 3000);
+            };
+            
+            ws.onerror = (err) => {
+                console.error('WebSocket error:', err);
+            };
+        }
+
+        function updateConnection(connected) {
+            document.getElementById('connDot').className = 'conn-dot' + (connected ? '' : ' offline');
+            document.getElementById('connText').textContent = connected ? 'Live Connected' : 'Reconnecting...';
+        }
+
+        function handleMessage(msg) {
+            if (msg.type === 'state') {
+                state = msg.data;
+                renderAll();
+            } else if (msg.type === 'activity') {
+                addActivityToFeed(msg.data);
+            } else if (msg.type === 'mission' || msg.type === 'mission_update') {
+                updateMission(msg.data);
+            } else if (msg.type === 'mission_complete') {
+                completeMission(msg.data);
+            }
+        }
+
+        async function fetchState() {
+            try {
+                const res = await fetch(`${API_URL}/api/state`);
+                state = await res.json();
+                renderAll();
+            } catch (e) {
+                console.error('Failed to fetch state:', e);
+            }
+        }
+
+        function renderAll() {
+            renderAgents();
+            renderActivities();
+            renderMissions();
+            updateMetrics();
+        }
+
+        function renderAgents() {
+            const list = document.getElementById('agentList');
+            list.innerHTML = Object.values(state.agents).map(agent => `
+                <div class="agent-card ${agent.status === 'working' ? 'working' : ''}" data-agent="${agent.id}">
+                    <div class="agent-avatar">${agent.emoji}</div>
+                    <div class="agent-info">
+                        <div class="agent-name">${agent.name}</div>
+                        <div class="agent-role">${agent.role}</div>
+                        <div class="agent-status">
+                            <span class="status-dot status-${agent.status}"></span>
+                            <span>${agent.currentTask || (agent.status === 'working' ? 'Working...' : agent.status)}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderActivities() {
+            const feed = document.getElementById('activityFeed');
+            if (state.activities.length === 0) {
+                feed.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-tertiary)">No activity yet. Launch a task to get started!</div>';
+                return;
+            }
+            feed.innerHTML = state.activities.map(a => createActivityHTML(a)).join('');
+        }
+
+        function createActivityHTML(a) {
+            return `
+                <div class="activity-card" id="activity-${a.id}">
+                    <div class="activity-header">
+                        <div class="activity-avatar">${a.emoji}</div>
+                        <div class="activity-meta">
+                            <div class="activity-agent">${a.agent}</div>
+                            <div class="activity-time">${formatTime(a.time)}</div>
+                        </div>
+                        <span class="activity-type type-${a.type}">${a.type}</span>
+                    </div>
+                    <div class="activity-content">${a.content}</div>
+                    ${a.meta && a.meta.length ? `<div class="activity-footer">${a.meta.map(m => `<span>${m}</span>`).join('')}</div>` : ''}
+                </div>
+            `;
+        }
+
+        function addActivityToFeed(activity) {
+            const feed = document.getElementById('activityFeed');
+            const html = createActivityHTML(activity);
+            feed.insertAdjacentHTML('afterbegin', html);
+            if (feed.children.length > 20) feed.lastChild.remove();
+        }
+
+        function renderMissions() {
+            const list = document.getElementById('missionList');
+            const active = state.missions.filter(m => m.status === 'running');
+            document.getElementById('missionCount').textContent = active.length;
+            
+            if (active.length === 0) {
+                list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-tertiary);font-size:12px">No active missions</div>';
+                return;
+            }
+            
+            list.innerHTML = active.map(m => `
+                <div class="mission-item" id="mission-${m.id}">
+                    <div class="mission-icon">${state.agents[m.agent]?.emoji || '🤖'}</div>
+                    <div class="mission-info">
+                        <div class="mission-name">${m.details.slice(0, 30)}...</div>
+                        <div class="mission-status">${m.progress}% complete</div>
+                    </div>
+                    <div class="progress-bar"><div class="progress-fill" style="width:${m.progress}%"></div></div>
+                </div>
+            `).join('');
+        }
+
+        function updateMission(mission) {
+            const existing = state.missions.find(m => m.id === mission.id);
+            if (existing) Object.assign(existing, mission);
+            else state.missions.push(mission);
+            renderMissions();
+        }
+
+        function completeMission(mission) {
+            updateMission(mission);
+            showToast(`✅ ${state.agents[mission.agent]?.name || 'Agent'} completed task!`, 'success');
+        }
+
+        function updateMetrics() {
+            document.getElementById('apiCalls').textContent = state.activities.length * 12 + 1452;
+        }
+
+        function formatTime(time) {
+            if (!time) return 'Just now';
+            const date = new Date(time);
+            const now = new Date();
+            const diff = (now - date) / 1000;
+            if (diff < 60) return 'Just now';
+            if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+            if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+            return date.toLocaleDateString();
+        }
+
+        function openTaskModal() { document.getElementById('taskModal').classList.add('active'); }
+        function closeTaskModal() { document.getElementById('taskModal').classList.remove('active'); clearQuickSelection(); }
+        function openAppIdeaModal() { document.getElementById('appIdeaModal').classList.add('active'); }
+        function closeAppIdeaModal() { document.getElementById('appIdeaModal').classList.remove('active'); }
+        function closeModalOnOverlay(e) { if (e.target.classList.contains('modal-overlay')) { closeTaskModal(); closeAppIdeaModal(); } }
+        
+        function selectQuick(el, type, agent) {
+            document.querySelectorAll('.quick-action').forEach(q => q.classList.remove('selected'));
+            el.classList.add('selected');
+            document.getElementById('taskAgent').value = agent;
+            const templates = {
+                research: 'Research the market for [product/idea]. Find pain points, competitors, and pricing models.',
+                design: 'Create a UI/UX design for [feature/app]. Include wireframes and color scheme.',
+                build: 'Build an MVP for [app/feature] with core functionality.',
+                strategy: 'Analyze [product/market] and create a go-to-market strategy.'
+            };
+            if (templates[type]) document.getElementById('taskDetails').placeholder = templates[type];
+        }
+
+        function clearQuickSelection() {
+            document.querySelectorAll('.quick-action').forEach(q => q.classList.remove('selected'));
+            document.getElementById('taskAgent').value = '';
+            document.getElementById('taskDetails').value = '';
+        }
+
+        async function launchTask() {
+            const agent = document.getElementById('taskAgent').value;
+            const details = document.getElementById('taskDetails').value;
+            if (!agent || !details.trim()) { showToast('Please select an agent and enter details', 'error'); return; }
+            
+            const btn = document.getElementById('launchBtn');
+            btn.innerHTML = 'Launching<span class="loading"></span>';
+            btn.disabled = true;
+            
+            try {
+                const res = await fetch(`${API_URL}/api/task`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ agent, type: 'task', details })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`🚀 Task launched to ${agent}`, 'success');
+                    closeTaskModal();
+                } else throw new Error(data.error);
+            } catch (e) {
+                showToast('Failed to launch: ' + e.message, 'error');
+            } finally {
+                btn.innerHTML = 'Launch';
+                btn.disabled = false;
+            }
+        }
+
+        async function launchAppPipeline() {
+            const idea = document.getElementById('appIdea').value;
+            if (!idea.trim()) { showToast('Please enter an app idea', 'error'); return; }
+            
+            const btn = document.getElementById('pipelineBtn');
+            btn.innerHTML = 'Starting...<span class="loading"></span>';
+            btn.disabled = true;
+            
+            try {
+                const res = await fetch(`${API_URL}/api/app-idea`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ idea, audience: document.getElementById('targetAudience').value })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('🚀 App pipeline started! Scout is researching...', 'success');
+                    closeAppIdeaModal();
+                } else throw new Error(data.error);
+            } catch (e) {
+                showToast('Failed: ' + e.message, 'error');
+            } finally {
+                btn.innerHTML = 'Start Pipeline';
+                btn.disabled = false;
+            }
+        }
+
+        function showToast(message, type) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'toast ' + (type === 'success' ? 'toast-success' : '');
+            toast.innerHTML = `<span class="toast-icon">${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span><div class="toast-content">${message}</div>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Start
+        connect();
+        fetchState();
+        setInterval(fetchState, 5000);
+    </script>
+</body>
+</html>

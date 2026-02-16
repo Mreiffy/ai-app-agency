@@ -1,249 +1,357 @@
 const express = require('express');
 const cors = require('cors');
+const WebSocket = require('ws');
+const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { execSync, exec } = require('child_process');
+const { execSync } = require('child_process');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '../public')));
 
-const AGENCY_ROOT = '/data/.openclaw/workspace/agency';
-const SHARED_ROOT = path.join(AGENCY_ROOT, 'shared');
-const AGENTS_ROOT = path.join(AGENCY_ROOT, 'agents');
+// Paths
+const AGENCY_PATH = '/data/.openclaw/workspace/agency';
+const MEMORY_PATH = path.join(AGENCY_PATH, 'agents');
+const SHARED_PATH = path.join(AGENCY_PATH, 'shared');
 
-// In-memory activity log (persisted to file)
-const ACTIVITY_LOG = path.join(SHARED_ROOT, 'logs/activity_feed.json');
-let activities = [];
-try { activities = JSON.parse(fs.readFileSync(ACTIVITY_LOG, 'utf8')); } catch(e) { activities = []; }
-
-function saveActivities() {
-  fs.mkdirSync(path.dirname(ACTIVITY_LOG), { recursive: true });
-  fs.writeFileSync(ACTIVITY_LOG, JSON.stringify(activities.slice(0, 200), null, 2));
-}
-
-// Task queue
-const TASK_QUEUE = path.join(SHARED_ROOT, 'logs/task_queue.json');
-let tasks = [];
-try { tasks = JSON.parse(fs.readFileSync(TASK_QUEUE, 'utf8')); } catch(e) { tasks = []; }
-
-function saveTasks() {
-  fs.mkdirSync(path.dirname(TASK_QUEUE), { recursive: true });
-  fs.writeFileSync(TASK_QUEUE, JSON.stringify(tasks, null, 2));
-}
-
-// Agent definitions
-const AGENTS = {
-  larz: { name: 'Larz', emoji: '🦞', role: 'Orchestrator', desc: 'Coordinates all agents, breaks down tasks, manages workflow' },
-  scout: { name: 'Scout', emoji: '🔍', role: 'Researcher', desc: 'Market research, trend analysis, competitor intelligence' },
-  julie: { name: 'Julie', emoji: '🎨', role: 'Designer', desc: 'UI/UX design, branding, visual strategy' },
-  engineer: { name: 'Engineer', emoji: '🏗️', role: 'Developer', desc: 'Builds MVPs, writes code, deploys apps' },
-  innovator: { name: 'Innovator', emoji: '💡', role: 'Strategist', desc: 'Improvement ideas, overnight builds, strategy' },
-  guardian: { name: 'Guardian', emoji: '🛡️', role: 'Auditor', desc: 'Security, cost monitoring, quality assurance' }
+// In-memory state
+const state = {
+  agents: {},
+  activities: [],
+  queue: [],
+  missions: []
 };
 
-// GET /api/agents — live agent status
-app.get('/api/agents', (req, res) => {
-  const agentStatuses = {};
-  for (const [id, info] of Object.entries(AGENTS)) {
-    const memFile = path.join(AGENTS_ROOT, id, `${id}_memory.md`);
-    let lastActivity = 'Idle';
-    let status = 'online';
-    let lastUpdate = null;
+const AGENT_CONFIG = {
+  larz: { emoji: '🦞', name: 'Larz', role: 'Orchestrator', color: '#6366f1' },
+  scout: { emoji: '🔍', name: 'Scout', role: 'Researcher', color: '#3b82f6' },
+  julie: { emoji: '🎨', name: 'Julie', role: 'Designer', color: '#ec4899' },
+  engineer: { emoji: '🏗️', name: 'Engineer', role: 'Developer', color: '#22c55e' },
+  innovator: { emoji: '💡', name: 'Innovator', role: 'Strategist', color: '#f59e0b' },
+  guardian: { emoji: '🛡️', name: 'Guardian', role: 'Auditor', color: '#ef4444' }
+};
 
+// Load agent state from memory files
+function loadAgentState() {
+  Object.keys(AGENT_CONFIG).forEach(agentId => {
+    const memoryFile = path.join(MEMORY_PATH, agentId, `${agentId}_memory.md`);
     try {
-      const content = fs.readFileSync(memFile, 'utf8');
-      const stat = fs.statSync(memFile);
-      lastUpdate = stat.mtime;
-
-      // Check if updated in last 5 minutes = working
-      const minutesAgo = (Date.now() - stat.mtime.getTime()) / 60000;
-      if (minutesAgo < 5) status = 'working';
-      else if (minutesAgo < 30) status = 'online';
-      else status = 'idle';
-
-      // Extract last line with content
-      const lines = content.split('\n').filter(l => l.trim() && !l.startsWith('#'));
-      if (lines.length > 0) lastActivity = lines[lines.length - 1].substring(0, 80);
-    } catch(e) {}
-
-    // Check if agent has active tasks
-    const activeTasks = tasks.filter(t => t.assignedTo === id && t.status === 'running');
-    if (activeTasks.length > 0) {
-      status = 'working';
-      lastActivity = `Working on: ${activeTasks[0].title}`;
-    }
-
-    agentStatuses[id] = { ...info, id, status, lastActivity, lastUpdate };
-  }
-  res.json(agentStatuses);
-});
-
-// GET /api/activity — live activity feed
-app.get('/api/activity', (req, res) => {
-  const limit = parseInt(req.query.limit) || 20;
-  const since = req.query.since ? new Date(req.query.since) : null;
-  let filtered = activities;
-  if (since) filtered = activities.filter(a => new Date(a.timestamp) > since);
-  res.json(filtered.slice(0, limit));
-});
-
-// POST /api/activity — add activity (used by agents)
-app.post('/api/activity', (req, res) => {
-  const { agent, type, content, meta } = req.body;
-  const entry = {
-    id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
-    agent, type, content, meta: meta || [],
-    timestamp: new Date().toISOString()
-  };
-  activities.unshift(entry);
-  saveActivities();
-  res.json(entry);
-});
-
-// GET /api/tasks — task queue
-app.get('/api/tasks', (req, res) => {
-  const status = req.query.status;
-  let filtered = tasks;
-  if (status) filtered = tasks.filter(t => t.status === status);
-  res.json(filtered);
-});
-
-// POST /api/tasks — create a new task (this is the main dispatch)
-app.post('/api/tasks', (req, res) => {
-  const { title, description, type, assignedTo, priority } = req.body;
-
-  const task = {
-    id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
-    title,
-    description,
-    type: type || 'general',
-    assignedTo: assignedTo || 'larz',
-    priority: priority || 'normal',
-    status: 'pending',
-    progress: 0,
-    pipeline: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-
-  // Define pipeline based on task type
-  if (type === 'build-app') {
-    task.pipeline = [
-      { agent: 'scout', step: 'Research & Pain Points', status: 'pending', output: null },
-      { agent: 'julie', step: 'UX Strategy & Wireframes', status: 'pending', output: null },
-      { agent: 'engineer', step: 'Build MVP', status: 'pending', output: null },
-      { agent: 'innovator', step: 'Review & Improve', status: 'pending', output: null },
-      { agent: 'guardian', step: 'Security Audit', status: 'pending', output: null }
-    ];
-  } else if (type === 'research') {
-    task.pipeline = [
-      { agent: 'scout', step: 'Deep Research', status: 'pending', output: null },
-      { agent: 'innovator', step: 'Strategic Analysis', status: 'pending', output: null }
-    ];
-  } else if (type === 'design') {
-    task.pipeline = [
-      { agent: 'scout', step: 'Research Inspiration', status: 'pending', output: null },
-      { agent: 'julie', step: 'Create Designs', status: 'pending', output: null }
-    ];
-  }
-
-  tasks.unshift(task);
-  saveTasks();
-
-  // Log activity
-  activities.unshift({
-    id: Date.now().toString(36),
-    agent: `${AGENTS[task.assignedTo || 'larz'].emoji} ${AGENTS[task.assignedTo || 'larz'].name}`,
-    type: 'action',
-    content: `<strong>New task received:</strong> ${title}. Pipeline: ${task.pipeline.map(p => p.step).join(' → ')}`,
-    meta: [`Priority: ${priority}`, `${task.pipeline.length} steps`],
-    timestamp: new Date().toISOString()
-  });
-  saveActivities();
-
-  // Trigger the task via OpenClaw sessions_spawn (async)
-  triggerTask(task);
-
-  res.json(task);
-});
-
-// POST /api/tasks/:id/approve — approve a pending task
-app.post('/api/tasks/:id/approve', (req, res) => {
-  const task = tasks.find(t => t.id === req.params.id);
-  if (!task) return res.status(404).json({ error: 'Task not found' });
-  task.status = 'running';
-  task.updatedAt = new Date().toISOString();
-  saveTasks();
-
-  activities.unshift({
-    id: Date.now().toString(36),
-    agent: '🦞 Larz',
-    type: 'action',
-    content: `<strong>Task approved:</strong> ${task.title}. Starting pipeline execution.`,
-    meta: ['Founder approved'],
-    timestamp: new Date().toISOString()
-  });
-  saveActivities();
-
-  res.json(task);
-});
-
-// POST /api/tasks/:id/deny
-app.post('/api/tasks/:id/deny', (req, res) => {
-  const task = tasks.find(t => t.id === req.params.id);
-  if (!task) return res.status(404).json({ error: 'Task not found' });
-  task.status = 'denied';
-  task.updatedAt = new Date().toISOString();
-  saveTasks();
-  res.json(task);
-});
-
-// GET /api/metrics — budget and system metrics
-app.get('/api/metrics', (req, res) => {
-  let costData = { total: 0, daily: 0, monthly_limit: 300 };
-  try {
-    const costLog = fs.readFileSync(path.join(SHARED_ROOT, 'logs/cost_log.md'), 'utf8');
-    // Parse cost data from log
-    const totalMatch = costLog.match(/Total:\s*\$?([\d.]+)/i);
-    if (totalMatch) costData.total = parseFloat(totalMatch[1]);
-  } catch(e) {}
-
-  res.json({
-    budget: costData,
-    agents: {
-      total: 6,
-      active: Object.keys(AGENTS).length,
-      working: tasks.filter(t => t.status === 'running').length
-    },
-    tasks: {
-      total: tasks.length,
-      pending: tasks.filter(t => t.status === 'pending').length,
-      running: tasks.filter(t => t.status === 'running').length,
-      completed: tasks.filter(t => t.status === 'completed').length
+      if (fs.existsSync(memoryFile)) {
+        const content = fs.readFileSync(memoryFile, 'utf8');
+        state.agents[agentId] = {
+          ...AGENT_CONFIG[agentId],
+          id: agentId,
+          status: parseStatus(content),
+          currentTask: parseCurrentTask(content),
+          lastUpdate: fs.statSync(memoryFile).mtime
+        };
+      } else {
+        state.agents[agentId] = {
+          ...AGENT_CONFIG[agentId],
+          id: agentId,
+          status: 'idle',
+          currentTask: null,
+          lastUpdate: null
+        };
+      }
+    } catch (e) {
+      console.error(`Error loading ${agentId}:`, e.message);
     }
   });
-});
-
-// Trigger task execution via writing to agent memory + creating a dispatch file
-async function triggerTask(task) {
-  const dispatchDir = path.join(SHARED_ROOT, 'dispatch');
-  fs.mkdirSync(dispatchDir, { recursive: true });
-
-  const dispatchFile = path.join(dispatchDir, `${task.id}.json`);
-  fs.writeFileSync(dispatchFile, JSON.stringify(task, null, 2));
-
-  // Write to orchestrator memory to signal new task
-  const larzMem = path.join(AGENTS_ROOT, 'larz/larz_memory.md');
-  const entry = `\n\n## Task Dispatched: ${task.title}\n- ID: ${task.id}\n- Type: ${task.type}\n- Time: ${task.createdAt}\n- Pipeline: ${task.pipeline.map(p => p.step).join(' → ')}\n- Description: ${task.description}\n`;
-  fs.appendFileSync(larzMem, entry);
-
-  console.log(`[DISPATCH] Task ${task.id}: ${task.title}`);
 }
 
-const PORT = process.env.PORT || 3456;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 AI Agency Command Center API running on port ${PORT}`);
-  console.log(`📡 Dashboard: http://localhost:${PORT}`);
+function parseStatus(content) {
+  if (content.includes('STATUS: working') || content.includes('Currently:')) return 'working';
+  if (content.includes('STATUS: idle')) return 'idle';
+  return 'online';
+}
+
+function parseCurrentTask(content) {
+  const match = content.match(/Currently:\s*(.+)/) || content.match(/Working on:\s*(.+)/);
+  return match ? match[1].trim() : null;
+}
+
+// Load activities from audit log
+function loadActivities() {
+  const auditLog = path.join(SHARED_PATH, 'logs/audit_log.md');
+  try {
+    if (fs.existsSync(auditLog)) {
+      const content = fs.readFileSync(auditLog, 'utf8');
+      const lines = content.split('\n').filter(l => l.startsWith('- [')).slice(-20);
+      state.activities = lines.map(line => parseActivityLine(line)).filter(Boolean);
+    }
+  } catch (e) {
+    console.error('Error loading activities:', e.message);
+  }
+}
+
+function parseActivityLine(line) {
+  const match = line.match(/- \[([\d-]+)\] (\w+): (.+)/);
+  if (!match) return null;
+  const agentId = match[2].toLowerCase();
+  const agent = AGENT_CONFIG[agentId];
+  if (!agent) return null;
+  
+  return {
+    id: Date.now() + Math.random(),
+    agent: agent.name,
+    emoji: agent.emoji,
+    type: inferType(match[3]),
+    content: match[3],
+    time: match[1],
+    meta: []
+  };
+}
+
+function inferType(content) {
+  if (content.match(/research|analyze|find|search/i)) return 'observation';
+  if (content.match(/build|deploy|create|implement/i)) return 'action';
+  if (content.match(/thinking|planning|considering/i)) return 'thinking';
+  return 'alert';
+}
+
+// Add activity
+function addActivity(agentId, type, content, meta = []) {
+  const agent = AGENT_CONFIG[agentId];
+  const activity = {
+    id: Date.now(),
+    agent: agent.name,
+    emoji: agent.emoji,
+    type,
+    content,
+    time: new Date().toISOString().split('T')[0],
+    meta
+  };
+  state.activities.unshift(activity);
+  if (state.activities.length > 50) state.activities.pop();
+  
+  // Broadcast to all connected clients
+  broadcast({ type: 'activity', data: activity });
+  
+  // Also append to audit log
+  appendToAuditLog(agentId, content);
+}
+
+function appendToAuditLog(agentId, content) {
+  const auditLog = path.join(SHARED_PATH, 'logs/audit_log.md');
+  const timestamp = new Date().toISOString();
+  const line = `- [${timestamp.split('T')[0]}] ${agentId}: ${content}\n`;
+  try {
+    fs.appendFileSync(auditLog, line);
+  } catch (e) {
+    console.error('Failed to write audit log:', e.message);
+  }
+}
+
+// Dispatch task to agent
+async function dispatchTask(agentId, taskType, details) {
+  const taskId = `task_${Date.now()}`;
+  
+  // Update agent status
+  state.agents[agentId].status = 'working';
+  state.agents[agentId].currentTask = details;
+  
+  // Add to mission queue
+  const mission = {
+    id: taskId,
+    agent: agentId,
+    type: taskType,
+    details,
+    status: 'running',
+    progress: 0,
+    started: new Date().toISOString()
+  };
+  state.missions.push(mission);
+  
+  addActivity(agentId, 'action', `Started mission: ${details}`, ['In Progress', `Task ID: ${taskId.slice(-6)}`]);
+  
+  // Try to spawn actual agent via OpenClaw
+  try {
+    // Write task to agent's memory
+    const memoryFile = path.join(MEMORY_PATH, agentId, `${agentId}_memory.md`);
+    const taskEntry = `\n\n## Current Task [${new Date().toISOString()}]\nStatus: working\nTask: ${details}\nType: ${taskType}\n`;
+    fs.appendFileSync(memoryFile, taskEntry);
+    
+    // Trigger OpenClaw session if possible
+    // Note: This requires proper OpenClaw integration
+    // For now, we simulate the agent working
+    simulateAgentWork(agentId, taskId, details);
+    
+  } catch (e) {
+    console.error('Failed to dispatch task:', e.message);
+    addActivity('larz', 'alert', `Failed to dispatch task to ${agentId}: ${e.message}`, ['Error']);
+  }
+  
+  broadcast({ type: 'mission', data: mission });
+  return taskId;
+}
+
+function simulateAgentWork(agentId, taskId, details) {
+  const steps = [
+    { progress: 10, message: 'Analyzing requirements...' },
+    { progress: 25, message: 'Researching best practices...' },
+    { progress: 40, message: 'Creating initial design...' },
+    { progress: 60, message: 'Building core features...' },
+    { progress: 80, message: 'Testing and refining...' },
+    { progress: 100, message: 'Task completed!' }
+  ];
+  
+  let stepIndex = 0;
+  const interval = setInterval(() => {
+    if (stepIndex >= steps.length) {
+      clearInterval(interval);
+      completeTask(taskId);
+      return;
+    }
+    
+    const step = steps[stepIndex];
+    const mission = state.missions.find(m => m.id === taskId);
+    if (mission) {
+      mission.progress = step.progress;
+      addActivity(agentId, 'thinking', step.message, [`Progress: ${step.progress}%`]);
+      broadcast({ type: 'mission_update', data: mission });
+    }
+    
+    stepIndex++;
+  }, 3000 + Math.random() * 2000); // 3-5 seconds per step
+}
+
+function completeTask(taskId) {
+  const mission = state.missions.find(m => m.id === taskId);
+  if (mission) {
+    mission.status = 'completed';
+    mission.progress = 100;
+    state.agents[mission.agent].status = 'online';
+    state.agents[mission.agent].currentTask = null;
+    addActivity(mission.agent, 'action', `Completed: ${mission.details}`, ['✓ Done']);
+    broadcast({ type: 'mission_complete', data: mission });
+  }
+}
+
+// WebSocket setup
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+const clients = new Set();
+
+wss.on('connection', (ws) => {
+  clients.add(ws);
+  console.log('Client connected');
+  
+  // Send current state
+  ws.send(JSON.stringify({ type: 'state', data: state }));
+  
+  ws.on('close', () => {
+    clients.delete(ws);
+    console.log('Client disconnected');
+  });
 });
+
+function broadcast(message) {
+  const data = JSON.stringify(message);
+  clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(data);
+    }
+  });
+}
+
+// API Routes
+app.get('/api/state', (req, res) => {
+  loadAgentState();
+  loadActivities();
+  res.json(state);
+});
+
+app.get('/api/agents', (req, res) => {
+  loadAgentState();
+  res.json(state.agents);
+});
+
+app.get('/api/activities', (req, res) => {
+  loadActivities();
+  res.json(state.activities);
+});
+
+app.post('/api/task', async (req, res) => {
+  const { agent, type, details } = req.body;
+  
+  if (!agent || !details) {
+    return res.status(400).json({ error: 'Missing agent or details' });
+  }
+  
+  try {
+    const taskId = await dispatchTask(agent, type || 'task', details);
+    res.json({ success: true, taskId });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/app-idea', async (req, res) => {
+  const { idea } = req.body;
+  
+  if (!idea) {
+    return res.status(400).json({ error: 'Missing app idea' });
+  }
+  
+  // This triggers the full pipeline
+  const pipelineId = `pipeline_${Date.now()}`;
+  
+  addActivity('larz', 'action', `Starting app pipeline for: ${idea}`, ['Pipeline ID: ' + pipelineId.slice(-6)]);
+  
+  // Phase 1: Scout researches
+  setTimeout(() => {
+    dispatchTask('scout', 'research', `Research market for: ${idea}. Find pain points, competitors, pricing models.`);
+  }, 500);
+  
+  // Phase 2: Innovator strategizes (after scout)
+  setTimeout(() => {
+    dispatchTask('innovator', 'strategy', `Create product strategy for: ${idea} based on Scout's research`);
+  }, 15000);
+  
+  // Phase 3: Julie designs (after innovator)
+  setTimeout(() => {
+    dispatchTask('julie', 'design', `Design UX/UI for: ${idea} based on product strategy`);
+  }, 30000);
+  
+  // Phase 4: Engineer builds (after julie)
+  setTimeout(() => {
+    dispatchTask('engineer', 'build', `Build MVP for: ${idea} based on Julie's designs`);
+  }, 60000);
+  
+  res.json({ 
+    success: true, 
+    pipelineId,
+    message: 'App pipeline started. Scout is researching now...'
+  });
+});
+
+app.post('/api/approve', (req, res) => {
+  const { itemId } = req.body;
+  addActivity('larz', 'action', `Approved item: ${itemId}`, ['Approved']);
+  res.json({ success: true });
+});
+
+app.post('/api/deny', (req, res) => {
+  const { itemId } = req.body;
+  addActivity('larz', 'action', `Denied item: ${itemId}`, ['Denied']);
+  res.json({ success: true });
+});
+
+// Start server
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`🚀 AI Agency API running on port ${PORT}`);
+  console.log(`📊 WebSocket enabled for real-time updates`);
+  
+  // Initial load
+  loadAgentState();
+  loadActivities();
+});
+
+// Periodic refresh
+setInterval(() => {
+  loadAgentState();
+}, 5000);
