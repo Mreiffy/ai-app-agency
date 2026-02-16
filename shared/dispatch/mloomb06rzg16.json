@@ -1,0 +1,44 @@
+{
+  "id": "mloomb06rzg16",
+  "title": "Test: Fitness Tracker App",
+  "description": "Build a fitness tracking app for busy professionals",
+  "type": "build-app",
+  "assignedTo": "larz",
+  "priority": "normal",
+  "status": "pending",
+  "progress": 0,
+  "pipeline": [
+    {
+      "agent": "scout",
+      "step": "Research & Pain Points",
+      "status": "pending",
+      "output": null
+    },
+    {
+      "agent": "julie",
+      "step": "UX Strategy & Wireframes",
+      "status": "pending",
+      "output": null
+    },
+    {
+      "agent": "engineer",
+      "step": "Build MVP",
+      "status": "pending",
+      "output": null
+    },
+    {
+      "agent": "innovator",
+      "step": "Review & Improve",
+      "status": "pending",
+      "output": null
+    },
+    {
+      "agent": "guardian",
+      "step": "Security Audit",
+      "status": "pending",
+      "output": null
+    }
+  ],
+  "createdAt": "2026-02-16T04:36:18.870Z",
+  "updatedAt": "2026-02-16T04:36:18.870Z"
+}
