@@ -3,7 +3,8 @@
   "agent": "julie",
   "task": "design",
   "details": "Design landing page for new fitness app",
-  "status": "running",
+  "status": "completed",
   "createdAt": "2026-02-16T04:54:06.758Z",
-  "output": null
+  "output": null,
+  "completedAt": "2026-02-16T04:54:30.768Z"
 }
