@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agency — Live Command Center</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root{--bg:#0a0a0f;--surface:#111118;--elevated:#1a1a22;--hover:#22222c;--border:#2a2a35;--border-light:#363640;--text:#fff;--text-sec:#a0a0b0;--text-dim:#6b6b7b;--accent:#6366f1;--accent-lt:#818cf8;--success:#22c55e;--warn:#f59e0b;--danger:#ef4444;--info:#3b82f6}
+        *{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5}
+        .app{display:grid;grid-template-columns:280px 1fr 360px;min-height:100vh}
+
+        /* Sidebar */
+        .sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:hidden}
+        .sidebar-header{padding:24px 20px;border-bottom:1px solid var(--border)}
+        .brand{display:flex;align-items:center;gap:12px}
+        .brand-icon{width:40px;height:40px;background:linear-gradient(135deg,var(--accent),#8b5cf6);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 20px rgba(99,102,241,0.3)}
+        .brand h1{font-size:16px;font-weight:700}.brand small{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px}
+        .nav-title{font-size:11px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.8px;padding:20px 20px 10px}
+        .agent-list{flex:1;overflow-y:auto;padding:0 12px 12px}
+        .agent-card{display:flex;align-items:center;gap:12px;padding:12px;border-radius:10px;cursor:pointer;transition:all .2s;border:1px solid transparent;margin-bottom:6px}
+        .agent-card:hover{background:var(--elevated);border-color:var(--border)}
+        .agent-card.active{background:var(--elevated);border-color:var(--accent)}
+        .agent-avatar{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;background:var(--bg);border:1px solid var(--border)}
+        .agent-info{flex:1;min-width:0}.agent-name{font-size:14px;font-weight:600}.agent-role{font-size:12px;color:var(--text-dim)}
+        .agent-status-line{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim);margin-top:3px}
+        .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+        .dot-working{background:var(--accent);box-shadow:0 0 6px var(--accent);animation:pulse 2s infinite}
+        .dot-online{background:var(--success);box-shadow:0 0 6px var(--success)}
+        .dot-idle{background:var(--text-dim)}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+        .sidebar-metrics{padding:16px;border-top:1px solid var(--border)}
+        .metric{display:flex;justify-content:space-between;padding:6px 0;font-size:13px}.metric-label{color:var(--text-sec)}.metric-val{font-weight:600;font-family:'JetBrains Mono',monospace}
+
+        /* Header */
+        .main{display:flex;flex-direction:column;min-height:100vh}
+        .topbar{height:56px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:10}
+        .topbar-left{display:flex;align-items:center;gap:16px}
+        .live-badge{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--success)}
+        .live-dot{width:7px;height:7px;background:var(--success);border-radius:50%;animation:livePulse 2s infinite}
+        @keyframes livePulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.4)}70%{box-shadow:0 0 0 6px transparent}100%{box-shadow:0 0 0 0 transparent}}
+        .topbar-actions{display:flex;gap:10px}
+        .btn{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;border:none;font-family:inherit}
+        .btn-ghost{background:var(--elevated);color:var(--text);border:1px solid var(--border)}.btn-ghost:hover{background:var(--hover);border-color:var(--border-light)}
+        .btn-primary{background:var(--accent);color:#fff;font-weight:600}.btn-primary:hover{background:var(--accent-lt);transform:translateY(-1px);box-shadow:0 4px 20px rgba(99,102,241,.3)}
+
+        /* Content */
+        .content{flex:1;padding:24px;overflow-y:auto}
+        .section-head{margin-bottom:20px}.section-head h2{font-size:18px;font-weight:700}.section-head p{font-size:13px;color:var(--text-sec);margin-top:4px}
+
+        /* Task Pipeline Banner */
+        .pipeline-banner{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;display:none}
+        .pipeline-banner.visible{display:block}
+        .pipeline-title{font-size:15px;font-weight:700;margin-bottom:12px}
+        .pipeline-steps{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+        .pipeline-step{display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12px;font-weight:500;transition:all .3s}
+        .pipeline-step.active{border-color:var(--accent);background:rgba(99,102,241,.1);color:var(--accent-lt)}
+        .pipeline-step.done{border-color:var(--success);background:rgba(34,197,94,.08);color:var(--success)}
+        .pipeline-arrow{color:var(--text-dim);font-size:16px}
+
+        /* Activity Feed */
+        .feed{display:flex;flex-direction:column;gap:12px}
+        .feed-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;transition:all .2s;animation:slideIn .3s ease}
+        @keyframes slideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .feed-card:hover{border-color:var(--border-light);background:var(--elevated)}
+        .feed-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+        .feed-av{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;background:var(--bg);border:1px solid var(--border)}
+        .feed-meta{flex:1}.feed-agent{font-size:14px;font-weight:600}.feed-time{font-size:11px;color:var(--text-dim)}
+        .feed-type{font-size:10px;padding:3px 10px;border-radius:20px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+        .t-thinking{background:rgba(99,102,241,.15);color:var(--accent-lt)}.t-action{background:rgba(34,197,94,.15);color:var(--success)}.t-observation{background:rgba(59,130,246,.15);color:var(--info)}.t-alert{background:rgba(245,158,11,.15);color:var(--warn)}
+        .feed-body{font-size:14px;line-height:1.6;color:var(--text-sec)}.feed-body strong{color:var(--text)}
+        .feed-foot{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:16px;font-size:11px;color:var(--text-dim)}
+
+        /* Right Panel */
+        .panel-r{background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+        .panel-sec{padding:20px;border-bottom:1px solid var(--border)}.panel-sec:last-child{border-bottom:none}
+        .panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+        .panel-title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-sec)}
+        .badge{font-size:11px;padding:2px 10px;border-radius:20px;font-weight:600;background:var(--elevated);color:var(--text-sec)}.badge-hot{background:rgba(239,68,68,.15);color:var(--danger)}
+
+        .q-item{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:8px;transition:all .2s}
+        .q-item:hover{border-color:var(--border-light)}.q-item.urgent{border-left:3px solid var(--danger)}
+        .q-title{font-size:13px;font-weight:600;margin-bottom:4px}.q-desc{font-size:12px;color:var(--text-dim);line-height:1.5;margin-bottom:8px}
+        .q-meta{display:flex;gap:12px;font-size:11px;color:var(--text-dim);margin-bottom:10px}
+        .q-actions{display:flex;gap:8px}
+        .btn-sm{padding:5px 12px;font-size:12px;border-radius:6px}
+        .btn-approve{background:rgba(34,197,94,.12);color:var(--success);border:1px solid rgba(34,197,94,.3)}.btn-approve:hover{background:var(--success);color:#fff}
+        .btn-deny{background:transparent;color:var(--text-dim);border:1px solid var(--border)}.btn-deny:hover{background:rgba(239,68,68,.12);color:var(--danger);border-color:var(--danger)}
+
+        .mission-item{display:flex;align-items:center;gap:12px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:10px;margin-bottom:8px}
+        .mission-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;background:var(--elevated)}
+        .mission-info{flex:1;min-width:0}.mission-name{font-size:13px;font-weight:600}.mission-status{font-size:11px;color:var(--text-dim)}
+        .prog{width:50px;height:4px;background:var(--elevated);border-radius:2px;overflow:hidden}.prog-fill{height:100%;background:var(--accent);border-radius:2px}
+
+        /* Modal */
+        .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;z-index:1000;padding:24px}.modal-bg.open{display:flex}
+        .modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:560px;animation:pop .2s ease}
+        @keyframes pop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+        .modal-head{padding:20px 24px;border-bottom:1px solid var(--border)}.modal-head h3{font-size:18px;font-weight:700}
+        .modal-body{padding:24px;max-height:65vh;overflow-y:auto}
+        .form-group{margin-bottom:20px}.form-label{display:block;font-size:13px;font-weight:500;margin-bottom:8px}
+        .form-input,.form-select,.form-textarea{width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:14px;outline:none}.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent)}.form-textarea{resize:vertical;min-height:100px}
+        .type-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:20px}
+        .type-card{padding:16px;background:var(--bg);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:all .2s;text-align:left}
+        .type-card:hover{border-color:var(--accent);background:rgba(99,102,241,.05)}
+        .type-card.selected{border-color:var(--accent);background:rgba(99,102,241,.1)}
+        .type-card .icon{font-size:24px;margin-bottom:6px}.type-card .title{font-size:14px;font-weight:600}.type-card .desc{font-size:11px;color:var(--text-dim);margin-top:2px}
+        .pipeline-preview{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:16px}
+        .pipeline-preview h4{font-size:12px;font-weight:600;color:var(--text-sec);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+        .preview-step{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:13px;color:var(--text-sec)}
+        .preview-step .num{width:22px;height:22px;border-radius:6px;background:var(--elevated);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--text-dim)}
+        .modal-foot{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:12px}
+
+        /* Toast */
+        .toasts{position:fixed;bottom:24px;right:24px;z-index:2000;display:flex;flex-direction:column;gap:10px}
+        .toast{padding:14px 20px;background:var(--surface);border:1px solid var(--success);border-radius:10px;display:flex;align-items:center;gap:12px;animation:toastIn .3s ease;box-shadow:0 10px 40px rgba(0,0,0,.4);min-width:280px;font-size:14px;font-weight:500}
+        @keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+
+        /* Empty state */
+        .empty{text-align:center;padding:60px 20px;color:var(--text-dim)}
+        .empty .icon{font-size:48px;margin-bottom:16px;opacity:.5}.empty p{font-size:14px}
+
+        @media(max-width:1200px){.app{grid-template-columns:260px 1fr}.panel-r{display:none}}
+        @media(max-width:768px){.app{grid-template-columns:1fr}.sidebar{display:none}}
+        ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+    </style>
+</head>
+<body>
+<div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="brand">
+                <div class="brand-icon">⚡</div>
+                <div><h1>AI Agency</h1><small>Live Command Center</small></div>
+            </div>
+        </div>
+        <div class="nav-title">Agents</div>
+        <div class="agent-list" id="agentList">
+            <!-- Populated by JS -->
+        </div>
+        <div class="sidebar-metrics" id="metrics">
+            <div class="metric"><span class="metric-label">Budget</span><span class="metric-val" id="mBudget">$0.00 / $300</span></div>
+            <div class="metric"><span class="metric-label">Tasks Active</span><span class="metric-val" id="mTasks">0</span></div>
+            <div class="metric"><span class="metric-label">Completed</span><span class="metric-val" id="mDone">0</span></div>
+        </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <div class="live-badge"><span class="live-dot"></span> Live</div>
+                <span style="font-size:14px;color:var(--text-sec)">Activity Feed</span>
+            </div>
+            <div class="topbar-actions">
+                <button class="btn btn-ghost" onclick="refreshAll()">↻ Refresh</button>
+                <button class="btn btn-primary" onclick="openModal()">+ New Task</button>
+            </div>
+        </header>
+
+        <div class="content">
+            <!-- Pipeline Banner -->
+            <div class="pipeline-banner" id="pipelineBanner">
+                <div class="pipeline-title" id="pipelineTitle">Building: App Name</div>
+                <div class="pipeline-steps" id="pipelineSteps"></div>
+            </div>
+
+            <div class="section-head"><h2>Activity</h2><p>Real-time agent thoughts and actions</p></div>
+            <div class="feed" id="feed">
+                <div class="empty"><div class="icon">📡</div><p>Waiting for agent activity...<br>Launch a task to get started.</p></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Right Panel -->
+    <aside class="panel-r">
+        <div class="panel-sec">
+            <div class="panel-head"><span class="panel-title">Pending Approval</span><span class="badge badge-hot" id="pendingCount">0</span></div>
+            <div id="pendingList"></div>
+        </div>
+        <div class="panel-sec">
+            <div class="panel-head"><span class="panel-title">Active Missions</span><span class="badge" id="activeCount">0</span></div>
+            <div id="missionList"></div>
+        </div>
+    </aside>
+</div>
+
+<!-- New Task Modal -->
+<div class="modal-bg" id="modal" onclick="if(event.target===this)closeModal()">
+    <div class="modal">
+        <div class="modal-head"><h3>Launch New Task</h3></div>
+        <div class="modal-body">
+            <div class="type-grid">
+                <div class="type-card" onclick="selectType(this,'build-app')"><div class="icon">🚀</div><div class="title">Build an App</div><div class="desc">Full pipeline: research → design → build → review → audit</div></div>
+                <div class="type-card" onclick="selectType(this,'research')"><div class="icon">🔍</div><div class="title">Research</div><div class="desc">Market analysis & strategic insights</div></div>
+                <div class="type-card" onclick="selectType(this,'design')"><div class="icon">🎨</div><div class="title">Design</div><div class="desc">UI/UX design & visual strategy</div></div>
+                <div class="type-card" onclick="selectType(this,'general')"><div class="icon">⚡</div><div class="title">Custom Task</div><div class="desc">Send directly to any agent</div></div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Task Title</label>
+                <input class="form-input" id="taskTitle" placeholder="e.g. Build a fitness tracker app">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <textarea class="form-textarea" id="taskDesc" placeholder="Describe what you want built, researched, or designed. Be specific about the target audience, key features, or goals..."></textarea>
+            </div>
+
+            <div class="pipeline-preview" id="pipelinePreview" style="display:none">
+                <h4>Pipeline Preview</h4>
+                <div id="previewSteps"></div>
+            </div>
+        </div>
+        <div class="modal-foot">
+            <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="submitTask()">🚀 Launch Task</button>
+        </div>
+    </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+const API = window.location.origin;
+let selectedType = null;
+let lastActivityTime = null;
+
+const PIPELINES = {
+    'build-app': [
+        { emoji: '🔍', agent: 'Scout', step: 'Research & Pain Points' },
+        { emoji: '🎨', agent: 'Julie', step: 'UX Strategy & Wireframes' },
+        { emoji: '🏗️', agent: 'Engineer', step: 'Build MVP' },
+        { emoji: '💡', agent: 'Innovator', step: 'Review & Improve' },
+        { emoji: '🛡️', agent: 'Guardian', step: 'Security Audit' }
+    ],
+    'research': [
+        { emoji: '🔍', agent: 'Scout', step: 'Deep Research' },
+        { emoji: '💡', agent: 'Innovator', step: 'Strategic Analysis' }
+    ],
+    'design': [
+        { emoji: '🔍', agent: 'Scout', step: 'Research Inspiration' },
+        { emoji: '🎨', agent: 'Julie', step: 'Create Designs' }
+    ]
+};
+
+async function fetchJSON(url) {
+    const r = await fetch(API + url);
+    return r.json();
+}
+
+async function postJSON(url, data) {
+    const r = await fetch(API + url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    return r.json();
+}
+
+// Load agents
+async function loadAgents() {
+    try {
+        const agents = await fetchJSON('/api/agents');
+        const list = document.getElementById('agentList');
+        list.innerHTML = Object.values(agents).map(a => `
+            <div class="agent-card ${a.status === 'working' ? 'active' : ''}" data-agent="${a.id}">
+                <div class="agent-avatar">${a.emoji}</div>
+                <div class="agent-info">
+                    <div class="agent-name">${a.name}</div>
+                    <div class="agent-role">${a.role}</div>
+                    <div class="agent-status-line">
+                        <span class="dot dot-${a.status}"></span>
+                        <span>${a.lastActivity.substring(0, 40)}</span>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    } catch(e) { console.error('Failed to load agents:', e); }
+}
+
+// Load activity feed
+async function loadActivity() {
+    try {
+        const url = lastActivityTime ? `/api/activity?since=${lastActivityTime}` : '/api/activity?limit=20';
+        const items = await fetchJSON(url);
+
+        if (items.length === 0 && !lastActivityTime) return;
+        if (items.length > 0) lastActivityTime = items[0].timestamp;
+
+        const feed = document.getElementById('feed');
+        // Clear empty state
+        if (feed.querySelector('.empty') && items.length > 0) feed.innerHTML = '';
+
+        items.reverse().forEach(a => {
+            const card = document.createElement('div');
+            card.className = 'feed-card';
+            const ago = timeAgo(a.timestamp);
+            const emoji = a.agent.split(' ')[0];
+            const name = a.agent.split(' ').slice(1).join(' ');
+            card.innerHTML = `
+                <div class="feed-head">
+                    <div class="feed-av">${emoji}</div>
+                    <div class="feed-meta"><div class="feed-agent">${name}</div><div class="feed-time">${ago}</div></div>
+                    <span class="feed-type t-${a.type}">${a.type}</span>
+                </div>
+                <div class="feed-body">${a.content}</div>
+                ${a.meta && a.meta.length ? `<div class="feed-foot">${a.meta.map(m => `<span>${m}</span>`).join('')}</div>` : ''}
+            `;
+            feed.insertBefore(card, feed.firstChild);
+        });
+
+        // Limit visible cards
+        while (feed.children.length > 30) feed.removeChild(feed.lastChild);
+    } catch(e) { console.error('Failed to load activity:', e); }
+}
+
+// Load tasks
+async function loadTasks() {
+    try {
+        const all = await fetchJSON('/api/tasks');
+        const pending = all.filter(t => t.status === 'pending');
+        const running = all.filter(t => t.status === 'running');
+        const done = all.filter(t => t.status === 'completed');
+
+        document.getElementById('pendingCount').textContent = pending.length;
+        document.getElementById('activeCount').textContent = running.length;
+
+        // Pending approvals
+        const pl = document.getElementById('pendingList');
+        pl.innerHTML = pending.length === 0 ? '<p style="font-size:13px;color:var(--text-dim)">No pending items</p>' :
+            pending.map(t => `
+                <div class="q-item ${t.priority === 'high' ? 'urgent' : ''}">
+                    <div class="q-title">${t.title}</div>
+                    <div class="q-desc">${(t.description || '').substring(0, 100)}</div>
+                    <div class="q-meta"><span>${t.type}</span><span>${timeAgo(t.createdAt)}</span></div>
+                    <div class="q-actions">
+                        <button class="btn btn-sm btn-deny" onclick="denyTask('${t.id}',this)">Deny</button>
+                        <button class="btn btn-sm btn-approve" onclick="approveTask('${t.id}',this)">Approve</button>
+                    </div>
+                </div>
+            `).join('');
+
+        // Active missions
+        const ml = document.getElementById('missionList');
+        ml.innerHTML = running.length === 0 ? '<p style="font-size:13px;color:var(--text-dim)">No active missions</p>' :
+            running.map(t => `
+                <div class="mission-item">
+                    <div class="mission-icon">${t.type === 'build-app' ? '🚀' : t.type === 'research' ? '🔍' : '⚡'}</div>
+                    <div class="mission-info"><div class="mission-name">${t.title}</div><div class="mission-status">${t.pipeline.length ? t.pipeline.find(p => p.status === 'running')?.step || 'Queued' : 'Running'}</div></div>
+                    <div class="prog"><div class="prog-fill" style="width:${t.progress}%"></div></div>
+                </div>
+            `).join('');
+
+        // Pipeline banner for first running task
+        const banner = document.getElementById('pipelineBanner');
+        if (running.length > 0 && running[0].pipeline.length > 0) {
+            const t = running[0];
+            banner.classList.add('visible');
+            document.getElementById('pipelineTitle').textContent = t.title;
+            document.getElementById('pipelineSteps').innerHTML = t.pipeline.map((p, i) => `
+                ${i > 0 ? '<span class="pipeline-arrow">→</span>' : ''}
+                <div class="pipeline-step ${p.status === 'running' ? 'active' : p.status === 'done' ? 'done' : ''}">${p.step}</div>
+            `).join('');
+        } else {
+            banner.classList.remove('visible');
+        }
+
+        // Metrics
+        document.getElementById('mTasks').textContent = running.length;
+        document.getElementById('mDone').textContent = done.length;
+    } catch(e) { console.error('Failed to load tasks:', e); }
+}
+
+// Load metrics
+async function loadMetrics() {
+    try {
+        const m = await fetchJSON('/api/metrics');
+        document.getElementById('mBudget').textContent = `$${m.budget.total.toFixed(2)} / $${m.budget.monthly_limit}`;
+    } catch(e) {}
+}
+
+async function approveTask(id, btn) {
+    await postJSON(`/api/tasks/${id}/approve`, {});
+    btn.closest('.q-item').style.opacity = '0';
+    setTimeout(() => { btn.closest('.q-item').remove(); loadTasks(); loadActivity(); }, 300);
+    toast('✅ Task approved and dispatched');
+}
+
+async function denyTask(id, btn) {
+    await postJSON(`/api/tasks/${id}/deny`, {});
+    btn.closest('.q-item').style.opacity = '0';
+    setTimeout(() => { btn.closest('.q-item').remove(); loadTasks(); }, 300);
+    toast('❌ Task denied');
+}
+
+function selectType(el, type) {
+    document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedType = type;
+
+    const preview = document.getElementById('pipelinePreview');
+    const steps = document.getElementById('previewSteps');
+    if (PIPELINES[type]) {
+        preview.style.display = 'block';
+        steps.innerHTML = PIPELINES[type].map((s, i) => `
+            <div class="preview-step"><span class="num">${i + 1}</span>${s.emoji} <strong>${s.agent}</strong> — ${s.step}</div>
+        `).join('');
+    } else {
+        preview.style.display = 'none';
+    }
+}
+
+async function submitTask() {
+    const title = document.getElementById('taskTitle').value.trim();
+    const desc = document.getElementById('taskDesc').value.trim();
+    if (!title) { toast('⚠️ Enter a task title'); return; }
+    if (!selectedType) { toast('⚠️ Select a task type'); return; }
+
+    await postJSON('/api/tasks', {
+        title, description: desc, type: selectedType, priority: 'normal'
+    });
+
+    closeModal();
+    toast('🚀 Task launched! Check the activity feed.');
+    setTimeout(() => { loadActivity(); loadTasks(); }, 500);
+}
+
+function openModal() { document.getElementById('modal').classList.add('open'); }
+function closeModal() {
+    document.getElementById('modal').classList.remove('open');
+    document.getElementById('taskTitle').value = '';
+    document.getElementById('taskDesc').value = '';
+    document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
+    document.getElementById('pipelinePreview').style.display = 'none';
+    selectedType = null;
+}
+
+function toast(msg) {
+    const c = document.getElementById('toasts');
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    c.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+}
+
+function timeAgo(ts) {
+    const diff = (Date.now() - new Date(ts).getTime()) / 1000;
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    return Math.floor(diff / 86400) + 'd ago';
+}
+
+async function refreshAll() {
+    await Promise.all([loadAgents(), loadActivity(), loadTasks(), loadMetrics()]);
+}
+
+// Initial load + polling
+refreshAll();
+setInterval(loadActivity, 5000);
+setInterval(loadAgents, 10000);
+setInterval(loadTasks, 8000);
+setInterval(loadMetrics, 30000);
+</script>
+</body>
+</html>
