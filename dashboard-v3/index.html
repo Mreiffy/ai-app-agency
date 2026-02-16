@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI App Agency - Software Factory</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-dark: #0a0a0f; --bg-panel: #12121a; --bg-card: #1a1a25; --border: #2a2a3a;
+            --cyan: #00f0ff; --cyan-dim: rgba(0,240,255,0.2); --purple: #a855f7;
+            --green: #22c55e; --green-dim: rgba(34,197,94,0.2); --yellow: #eab308; --red: #ef4444;
+            --text: #fff; --text-dim: #9ca3af;
+        }
+        body { font-family: 'SF Mono', Monaco, monospace; background: var(--bg-dark); color: var(--text); min-height: 100vh; overflow: hidden; }
+        .bg-grid { position: fixed; inset: 0; background-image: linear-gradient(rgba(0,240,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,240,255,0.03) 1px,transparent 1px); background-size: 40px 40px; pointer-events: none; }
+        header { height: 60px; background: var(--bg-panel); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; }
+        .logo { display: flex; align-items: center; gap: 12px; }
+        .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg,var(--cyan-dim),rgba(168,85,247,0.2)); border: 1px solid var(--cyan-dim); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .logo-text h1 { font-size: 16px; font-weight: 600; letter-spacing: 0.5px; }
+        .logo-text span { font-size: 11px; color: var(--text-dim); }
+        .stats-bar { display: flex; gap: 32px; }
+        .stat { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+        .stat-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+        .manager-badge { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
+        .manager-badge .avatar { width: 28px; height: 28px; background: linear-gradient(135deg,var(--purple),var(--cyan)); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+        main { display: grid; grid-template-columns: 280px 1fr 320px; height: calc(100vh - 60px); }
+        .panel { background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+        .panel:last-child { border-right: none; border-left: 1px solid var(--border); }
+        .panel-header { padding: 16px 20px; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); display: flex; align-items: center; justify-content: space-between; }
+        .panel-content { flex: 1; overflow-y: auto; padding: 16px; }
+        .agent-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s; position: relative; }
+        .agent-card:hover { border-color: #3a3a4a; background: #1e1e2e; }
+        .agent-card.selected { border-color: var(--cyan); background: rgba(0,240,255,0.05); }
+        .agent-card.busy { border-left: 3px solid var(--cyan); }
+        .agent-card.idle { border-left: 3px solid var(--green); }
+        .agent-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .agent-avatar { font-size: 24px; }
+        .agent-info h3 { font-size: 14px; font-weight: 600; }
+        .agent-info span { font-size: 11px; color: var(--text-dim); }
+        .agent-status { display: flex; align-items: center; gap: 6px; font-size: 11px; margin-top: 6px; }
+        .status-indicator { width: 6px; height: 6px; border-radius: 50%; }
+        .status-indicator.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
+        .status-indicator.working { background: var(--cyan); box-shadow: 0 0 6px var(--cyan); animation: blink 1.5s infinite; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        .assign-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); padding: 6px 12px; background: var(--cyan-dim); border: 1px solid var(--cyan-dim); color: var(--cyan); border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; opacity: 0; transition: all 0.2s; }
+        .agent-card:hover .assign-btn { opacity: 1; }
+        .assign-btn:hover { background: var(--cyan); color: var(--bg-dark); }
+        .factory-floor { background: var(--bg-dark); position: relative; overflow: hidden; }
+        .floor-title { position: absolute; top: 20px; left: 24px; font-size: 14px; font-weight: 600; color: var(--text-dim); z-index: 10; }
+        .workstations { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; padding: 60px 24px 24px; height: 100%; }
+        .workstation { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px; position: relative; transition: all 0.3s; }
+        .workstation:hover { border-color: #3a3a4a; transform: translateY(-2px); }
+        .workstation.active { border-color: var(--cyan); box-shadow: 0 0 30px rgba(0,240,255,0.1); }
+        .workstation-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .workstation-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); }
+        .workstation-status { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
+        .workstation-status.busy { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); animation: pulse 2s infinite; }
+        .workstation-content { display: flex; flex-direction: column; align-items: center; justify-content: center; height: calc(100% - 40px); text-align: center; }
+        .workstation-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.8; }
+        .workstation-agent { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+        .workstation-task { font-size: 12px; color: var(--text-dim); }
+        .progress-ring { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); width: 120px; height: 4px; background: var(--bg-card); border-radius: 2px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg,var(--cyan),var(--purple)); border-radius: 2px; transition: width 0.5s; }
+        .approval-item { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 10px; border-left: 3px solid var(--yellow); }
+        .approval-item.urgent { border-left-color: var(--red); animation: urgent-pulse 2s infinite; }
+        @keyframes urgent-pulse { 0%,100%{box-shadow:0 0 0 rgba(239,68,68,0)} 50%{box-shadow:0 0 10px rgba(239,68,68,0.3)} }
+        .approval-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .approval-type { font-size: 10px; padding: 2px 8px; background: rgba(234,179,8,0.2); color: var(--yellow); border-radius: 4px; font-weight: 600; }
+        .approval-title { font-size: 13px; font-weight: 600; }
+        .approval-desc { font-size: 12px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.5; }
+        .approval-meta { display: flex; align-items: center; gap: 12px; font-size: 11px; color: var(--text-dim); margin-bottom: 12px; }
+        .approval-actions { display: flex; gap: 8px; }
+        .btn { flex: 1; padding: 8px 16px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; border: none; }
+        .btn-approve { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); }
+        .btn-approve:hover { background: var(--green); color: var(--bg-dark); }
+        .btn-deny { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
+        .btn-deny:hover { background: rgba(239,68,68,0.1); color: var(--red); border-color: var(--red); }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 16px; width: 500px; max-width: 90%; max-height: 80vh; overflow: hidden; }
+        .modal-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+        .modal-header h2 { font-size: 16px; font-weight: 600; }
+        .modal-close { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        .modal-close:hover { background: var(--bg-card); color: var(--text); }
+        .modal-body { padding: 24px; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); margin-bottom: 8px; }
+        .form-group select, .form-group textarea { width: 100%; padding: 12px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: inherit; font-size: 14px; resize: vertical; }
+        .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--cyan); }
+        .form-group textarea { min-height: 120px; }
+        .mission-presets { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
+        .mission-preset { padding: 10px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; text-align: left; font-size: 12px; color: var(--text); transition: all 0.2s; }
+        .mission-preset:hover { border-color: var(--cyan); background: rgba(0,240,255,0.05); }
+        .mission-preset strong { display: block; margin-bottom: 4px; color: var(--cyan); }
+        .mission-preset span { color: var(--text-dim); font-size: 11px; }
+        .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 12px; }
+        .btn-primary { padding: 10px 24px; background: var(--cyan); color: var(--bg-dark); border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn-primary:hover { box-shadow: 0 0 20px var(--cyan-dim); }
+        .btn-secondary { padding: 10px 24px; background: transparent; color: var(--text-dim); border: 1px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn-secondary:hover { color: var(--text); border-color: var(--text-dim); }
+        .empty-state { text-align: center; padding: 40px 20px; color: var(--text-dim); }
+        .empty-state-icon { font-size: 32px; margin-bottom: 12px; opacity: 0.5; }
+        .empty-state p { font-size: 13px; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-dark); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3a3a4a; }
+        .toast { position: fixed; bottom: 24px; right: 24px; padding: 16px 24px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 10px; display: flex; align-items: center; gap: 12px; transform: translateX(400px); transition: transform 0.3s; z-index: 1001; }
+        .toast.show { transform: translateX(0); }
+        .toast.success { border-color: var(--green); }
+        .toast-icon { font-size: 20px; }
+        .toast-content strong { display: block; font-size: 14px; margin-bottom: 2px; }
+        .toast-content span { font-size: 12px; color: var(--text-dim); }
+        .launch-btn { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); padding: 16px 32px; background: linear-gradient(135deg,var(--cyan),var(--purple)); color: var(--bg-dark); border: none; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 30px rgba(0,240,255,0.3); transition: all 0.3s; z-index: 100; }
+        .launch-btn:hover { transform: translateX(-50%) translateY(-2px); box-shadow: 0 8px 40px rgba(0,240,255,0.4); }
+    </style>
+</head>
+<body>
+    <div class="bg-grid"></div>
+    <header>
+        <div class="logo">
+            <div class="logo-icon">🏭</div>
+            <div class="logo-text"><h1>SOFTWARE FACTORY</h1><span>AI App Agency Command Center</span></div>
+        </div>
+        <div class="stats-bar">
+            <div class="stat"><div class="stat-dot"></div><span>6 Agents Online</span></div>
+            <div class="stat"><span style="color:var(--cyan)">●</span><span>2 Active Tasks</span></div>
+            <div class="stat"><span style="color:var(--yellow)">●</span><span id="pending-count">3 Pending</span></div>
+            <div class="stat"><span>$</span><span>$0.00 / $300</span></div>
+        </div>
+        <div class="manager-badge">
+            <div class="avatar">👤</div>
+            <div><div style="font-weight:600">Factory Manager</div><div style="font-size:11px;color:var(--text-dim)">You</div></div>
+        </div>
+    </header>
+    <main>
+        <aside class="panel">
+            <div class="panel-header"><span>👥 Agent Roster</span><span style="color:var(--green)">●</span></div>
+            <div class="panel-content" id="agent-list"></div>
+        </aside>
+        <section class="factory-floor">
+            <div class="floor-title">🏭 FACTORY FLOOR — Click workstation to view details</div>
+            <div class="workstations" id="workstations"></div>
+        </section>
+        <aside class="panel approval-queue">
+            <div class="panel-header"><span>📋 Approval Queue</span><span id="queue-badge" style="background:rgba(234,179,8,0.2);color:var(--yellow);padding:2px 8px;border-radius:10px;font-size:11px">3</span></div>
+            <div class="panel-content" id="approval-queue"></div>
+        </aside>
+    </main>
+    <button class="launch-btn" onclick="openMissionModal()">🚀 LAUNCH MISSION</button>
+    <div class="modal-overlay" id="mission-modal">
+        <div class="modal">
+            <div class="modal-header"><h2>🚀 Assign Mission</h2><button class="modal-close" onclick="closeModal()">×</button></div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Select Agent</label>
+                    <select id="mission-agent">
+                        <option value="">Choose an agent...</option>
+                        <option value="scout">🔍 Scout — Researcher</option>
+                        <option value="julie">🎨 Julie — Content & Design</option>
+                        <option value="engineer">🏗️ Engineer — Developer</option>
+                        <option value="innovator">💡 Innovator — Improver</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Quick Missions</label>
+                    <div class="mission-presets">
+                        <button class="mission-preset" onclick="setMission('research','Deep research on AI video tools trend')"><strong>🔍 Deep Research</strong><span>Scout analyzes a topic</span></button>
+                        <button class="mission-preset" onclick="setMission('design','Create landing page design')"><strong>🎨 Design Assets</strong><span>Julie creates visuals</span></button>
+                        <button class="mission-preset" onclick="setMission('build','Build MVP web app')"><strong>🏗️ Build App</strong><span>Engineer ships prototype</span></button>
+                        <button class="mission-preset" onclick="setMission('improve','Optimize current workflow')"><strong>💡 Innovate</strong><span>Innovator suggests improvements</span></button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Mission Details</label>
+                    <textarea id="mission-details" placeholder="Describe what you want the agent to do..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer"><button class="btn-secondary" onclick="closeModal()">Cancel</button><button class="btn-primary" onclick="assignMission()">🚀 Launch Mission</button></div>
+        </div>
+    </div>
+    <div class="toast" id="toast"><span class="toast-icon">✅</span><div class="toast-content"><strong id="toast-title">Success</strong><span id="toast-message">Mission assigned</span></div></div>
+    <script>
+        const agents=[{id:'larz',name:'Larz',role:'Chief Orchestrator',avatar:'🦞',status:'online',task:'Managing operations',progress:100,busy:false},{id:'scout',name:'Scout',role:'Trend Researcher',avatar:'🔍',status:'working',task:'Scanning Product Hunt',progress:65,busy:true},{id:'julie',name:'Julie',role:'Content & Design',avatar:'🎨',status:'idle',task:'Ready for assignment',progress:0,busy:false},{id:'engineer',name:'Engineer',role:'Full-Stack Dev',avatar:'🏗️',status:'idle',task:'Ready for assignment',progress:0,busy:false},{id:'innovator',name:'Innovator',role:'Proactive Improver',avatar:'💡',status:'working',task:'Planning overnight build',progress:30,busy:true},{id:'guardian',name:'Guardian',role:'Cost & Safety',avatar:'🛡️',status:'online',task:'Monitoring costs',progress:100,busy:false}];
+        const workstations=[{id:'research',name:'Research Lab',icon:'🔬',agent:'scout'},{id:'design',name:'Design Studio',icon:'🎨',agent:'julie'},{id:'build',name:'Build Station',icon:'⚡',agent:'engineer'},{id:'strategy',name:'Strategy Room',icon:'📊',agent:'larz'},{id:'innovation',name:'Innovation Lab',icon:'💡',agent:'innovator'},{id:'security',name:'Security Hub',icon:'🔒',agent:'guardian'}];
+        let approvals=[{id:1,type:'deploy',title:'Deploy Dashboard V2',desc:'Engineer has built the new dashboard. Ready to deploy.',agent:'Engineer',time:'2 min ago',urgent:false},{id:2,type:'build',title:'Build PromptSync App',desc:'High demand for prompt management. Build MVP?',agent:'Innovator',time:'15 min ago',urgent:true},{id:3,type:'budget',title:'Approve API Spend',desc:'Request: $5 for Claude API calls.',agent:'Guardian',time:'1 hour ago',urgent:false}];
+        function renderAgents(){const container=document.getElementById('agent-list');container.innerHTML=agents.map(agent=>`<div class="agent-card ${agent.busy?'busy':'idle'}" onclick="showAgentDetails('${agent.id}')"><div class="agent-header"><span class="agent-avatar">${agent.avatar}</span><div class="agent-info"><h3>${agent.name}</h3><span>${agent.role}</span></div></div><div class="agent-status"><span class="status-indicator ${agent.status}"></span><span>${agent.busy?'Working':'Available'}</span></div>${!agent.busy?`<button class="assign-btn" onclick="event.stopPropagation();openMissionModal('${agent.id}')">Assign</button>`:''}</div>`).join('')}
+        function renderWorkstations(){const container=document.getElementById('workstations');container.innerHTML=workstations.map(ws=>{const agent=agents.find(a=>a.id===ws.agent);return`<div class="workstation ${agent.busy?'active':''}" onclick="showAgentDetails('${agent.id}')"><div class="workstation-header"><span class="workstation-title">${ws.name}</span><span class="workstation-status ${agent.busy?'busy':''}"></span></div><div class="workstation-content"><div class="workstation-icon">${agent.avatar}</div><div class="workstation-agent">${agent.name}</div><div class="workstation-task">${agent.task}</div></div>${agent.busy?`<div class="progress-ring"><div class="progress-fill" style="width:${agent.progress}%"></div></div>`:''}</div>`}).join('')}
+        function renderApprovals(){const container=document.getElementById('approval-queue');document.getElementById('queue-badge').textContent=approvals.length;document.getElementById('pending-count').textContent=approvals.length+' Pending';if(approvals.length===0){container.innerHTML=`<div class="empty-state"><div class="empty-state-icon">📋</div><p>No pending approvals</p></div>`;return}container.innerHTML=approvals.map(item=>`<div class="approval-item ${item.urgent?'urgent':''}"><div class="approval-header"><span class="approval-type">${item.type.toUpperCase()}</span><span class="approval-title">${item.title}</span></div><div class="approval-desc">${item.desc}</div><div class="approval-meta"><span>👤 ${item.agent}</span><span>🕐 ${item.time}</span></div><div class="approval-actions"><button class="btn btn-deny" onclick="denyApproval(${item.id})">Deny</button><button class="btn btn-approve" onclick="approveItem(${item.id})">Approve</button></div></div>`).join('')}
+        function showAgentDetails(agentId){const agent=agents.find(a=>a.id===agentId);showToast('👤 '+agent.name,agent.role+' - '+agent.task)}
+        function openMissionModal(agentId){document.getElementById('mission-modal').classList.add('active');if(agentId)document.getElementById('mission-agent').value=agentId}
+        function closeModal(){document.getElementById('mission-modal').classList.remove('active')}
+        function setMission(type,desc){document.getElementById('mission-details').value=desc}
+        function assignMission(){const agentId=document.getElementById('mission-agent').value;const details=document.getElementById('mission-details').value;if(!agentId||!details){showToast('❌ Error','Please select an agent and enter mission details');return}const agent=agents.find(a=>a.id===agentId);agent.busy=true;agent.status='working';agent.task=details.substring(0,50)+(details.length>50?'...':'');agent.progress=0;closeModal();renderAgents();renderWorkstations();showToast('🚀 Mission Launched',agent.name+' is now working on: '+details.substring(0,30)+'...');setTimeout(()=>{agent.progress=25;renderWorkstations()},1000);setTimeout(()=>{agent.progress=50;renderWorkstations()},3000);setTimeout(()=>{agent.progress=75;renderWorkstations()},5000);setTimeout(()=>{agent.progress=100;agent.busy=false;agent.status='idle';agent.task='Ready for assignment';renderAgents();renderWorkstations();approvals.push({id:Date.now(),type:'complete',title:agent.name+' completed task',desc:details.substring(0,60)+'...',agent:agent.name,time:'Just now',urgent:false});renderApprovals();showToast('✅ Task Complete',agent.name+' finished the mission and awaits your review')},8000)}
+        function approveItem(id){const item=approvals.find(a=>a.id===id);approvals=approvals.filter(a=>a.id!==id);renderApprovals();showToast('✅ Approved',item.title+' has been approved')}
+        function denyApproval(id){const item=approvals.find(a=>a.id===id);approvals=approvals.filter(a=>a.id!==id);renderApprovals();showToast('❌ Denied',item.title+' has been rejected')}
+        function showToast(title,message){const toast=document.getElementById('toast');document.getElementById('toast-title').textContent=title;document.getElementById('toast-message').textContent=message;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),3000)}
+        renderAgents();renderWorkstations();renderApprovals();
+    </script>
+</body>
+</html>
