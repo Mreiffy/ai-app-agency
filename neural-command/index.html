@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The AI Agency — Neural Command</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #050508; --surface: #0a0a0f; --elevated: #111118; --hover: #181820; --border: #1e1e28; --border-light: #2a2a38;
+            --text: #fff; --muted: #6b7280; --subtle: #374151; --accent: #00f0ff; --accent-dim: rgba(0,240,255,0.1);
+            --success: #10b981; --warning: #f59e0b; --danger: #ef4444; --purple: #8b5cf6; --pink: #ec4899;
+        }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow: hidden; line-height: 1.5; }
+        .ambient { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+        .ambient::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle at 20% 80%, rgba(0,240,255,0.03) 0%, transparent 40%), radial-gradient(circle at 80% 20%, rgba(139,92,246,0.03) 0%, transparent 40%), radial-gradient(circle at 50% 50%, rgba(236,72,153,0.02) 0%, transparent 50%); animation: ambient-shift 20s ease-in-out infinite; }
+        @keyframes ambient-shift { 0%,100% { transform: translate(0,0) rotate(0deg); } 33% { transform: translate(2%,2%) rotate(1deg); } 66% { transform: translate(-1%,1%) rotate(-1deg); } }
+        .grid-overlay { position: fixed; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px); background-size: 60px 60px; pointer-events: none; z-index: 1; }
+        .app { position: relative; z-index: 10; height: 100vh; display: grid; grid-template-rows: auto 1fr; }
+        .header { height: 56px; background: rgba(10,10,15,0.8); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; }
+        .brand { display: flex; align-items: center; gap: 12px; }
+        .brand-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--purple)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 0 20px rgba(0,240,255,0.3); animation: pulse-glow 3s ease-in-out infinite; }
+        @keyframes pulse-glow { 0%,100% { box-shadow: 0 0 20px rgba(0,240,255,0.3); } 50% { box-shadow: 0 0 40px rgba(0,240,255,0.5); } }
+        .brand-text { font-weight: 600; font-size: 15px; letter-spacing: -0.3px; }
+        .brand-sub { font-size: 10px; color: var(--muted); font-weight: 500; letter-spacing: 1px; text-transform: uppercase; }
+        .header-center { display: flex; align-items: center; gap: 32px; }
+        .metric-pill { display: flex; align-items: center; gap: 8px; padding: 6px 14px; background: var(--elevated); border: 1px solid var(--border); border-radius: 20px; font-size: 12px; }
+        .metric-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); box-shadow: 0 0 8px var(--success); }
+        .metric-dot.active { background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: blink 1.5s infinite; }
+        @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .header-actions { display: flex; align-items: center; gap: 12px; }
+        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; border: none; outline: none; }
+        .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+        .btn-ghost:hover { background: var(--elevated); color: var(--text); border-color: var(--border-light); }
+        .btn-primary { background: linear-gradient(135deg, var(--accent), var(--purple)); color: var(--bg); font-weight: 600; box-shadow: 0 0 20px rgba(0,240,255,0.2); }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 24px rgba(0,240,255,0.4); }
+        .main { display: grid; grid-template-columns: 300px 1fr 380px; overflow: hidden; }
+        .panel { background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+        .panel:last-child { border-right: none; border-left: 1px solid var(--border); }
+        .panel-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+        .panel-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+        .panel-content { flex: 1; overflow-y: auto; padding: 16px; }
+        .neural-feed { background: transparent; border: none; padding: 20px; overflow-y: auto; }
+        .feed-header { margin-bottom: 20px; }
+        .feed-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+        .feed-subtitle { font-size: 13px; color: var(--muted); }
+        .thought-stream { display: flex; flex-direction: column; gap: 12px; }
+        .thought-card { background: var(--elevated); border: 1px solid var(--border); border-radius: 12px; padding: 16px; transition: all 0.2s; animation: slide-in 0.3s ease; }
+        @keyframes slide-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .thought-card:hover { border-color: var(--border-light); background: var(--hover); }
+        .thought-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .thought-avatar { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; background: var(--surface); border: 1px solid var(--border); }
+        .thought-agent { font-size: 13px; font-weight: 600; }
+        .thought-time { margin-left: auto; font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+        .thought-type { font-size: 10px; padding: 2px 8px; border-radius: 4px; font-weight: 500; text-transform: uppercase; }
+        .thought-type.reasoning { background: rgba(0,240,255,0.1); color: var(--accent); }
+        .thought-type.action { background: rgba(16,185,129,0.1); color: var(--success); }
+        .thought-type.observation { background: rgba(139,92,246,0.1); color: var(--purple); }
+        .thought-content { font-size: 14px; line-height: 1.6; color: var(--text); }
+        .thought-meta { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); display: flex; gap: 16px; font-size: 11px; color: var(--muted); }
+        .thought-confidence { color: var(--success); }
+        .agent-grid { display: flex; flex-direction: column; gap: 10px; }
+        .agent-node { background: var(--elevated); border: 1px solid var(--border); border-radius: 10px; padding: 14px; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; }
+        .agent-node::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: transparent; transition: background 0.2s; }
+        .agent-node:hover { border-color: var(--border-light); transform: translateX(2px); }
+        .agent-node.active::before { background: var(--accent); }
+        .agent-node.active { background: rgba(0,240,255,0.05); border-color: rgba(0,240,255,0.3); }
+        .agent-node-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .agent-node-avatar { font-size: 20px; }
+        .agent-node-info { flex: 1; }
+        .agent-node-name { font-size: 13px; font-weight: 600; }
+        .agent-node-role { font-size: 11px; color: var(--muted); }
+        .agent-node-status { width: 8px; height: 8px; border-radius: 50%; }
+        .agent-node-status.online { background: var(--success); box-shadow: 0 0 8px var(--success); }
+        .agent-node-status.thinking { background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .agent-node-activity { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .intel-section { margin-bottom: 20px; }
+        .intel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .intel-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+        .intel-count { font-size: 11px; padding: 2px 8px; background: var(--elevated); border-radius: 10px; color: var(--muted); }
+        .intel-list { display: flex; flex-direction: column; gap: 8px; }
+        .intel-item { background: var(--elevated); border: 1px solid var(--border); border-radius: 8px; padding: 12px; cursor: pointer; transition: all 0.2s; }
+        .intel-item:hover { border-color: var(--border-light); background: var(--hover); }
+        .intel-item.urgent { border-left: 3px solid var(--danger); }
+        .intel-item-title { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+        .intel-item-desc { font-size: 11px; color: var(--muted); line-height: 1.4; }
+        .intel-item-meta { margin-top: 8px; display: flex; gap: 12px; font-size: 10px; color: var(--subtle); }
+        .action-bar { display: flex; gap: 8px; margin-top: 12px; }
+        .btn-micro { padding: 4px 10px; font-size: 10px; font-weight: 500; border-radius: 6px; cursor: pointer; transition: all 0.2s; border: none; }
+        .btn-micro-approve { background: rgba(16,185,129,0.1); color: var(--success); border: 1px solid rgba(16,185,129,0.3); }
+        .btn-micro-approve:hover { background: var(--success); color: var(--bg); }
+        .btn-micro-deny { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+        .btn-micro-deny:hover { background: rgba(239,68,68,0.1); color: var(--danger); border-color: var(--danger); }
+        .live-indicator { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--success); font-weight: 500; }
+        .live-dot { width: 6px; height: 6px; background: var(--success); border-radius: 50%; animation: live-pulse 2s infinite; }
+        @keyframes live-pulse { 0% { box-shadow: 0 0 0 0 rgba(16,185,129,0.4); } 70% { box-shadow: 0 0 0 6px rgba(16,185,129,0); } 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); } }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+    </style>
+</head>
+<body>
+    <div class="ambient"></div>
+    <div class="grid-overlay"></div>
+    <div class="app">
+        <header class="header">
+            <div class="brand">
+                <div class="brand-icon">◉</div>
+                <div>
+                    <div class="brand-text">The AI Agency</div>
+                    <div class="brand-sub">Neural Command</div>
+                </div>
+            </div>
+            <div class="header-center">
+                <div class="metric-pill"><div class="metric-dot active"></div><span>6 Agents Active</span></div>
+                <div class="metric-pill"><span style="color:var(--accent)">●</span><span>2 Processing</span></div>
+                <div class="metric-pill"><span style="color:var(--success)">●</span><span>$0.00 / $300</span></div>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-ghost">📊 Analytics</button>
+                <button class="btn btn-primary">+ New Mission</button>
+            </div>
+        </header>
+        <main class="main">
+            <aside class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">Agent Network</span>
+                    <div class="live-indicator"><div class="live-dot"></div>LIVE</div>
+                </div>
+                <div class="panel-content">
+                    <div class="agent-grid">
+                        <div class="agent-node active">
+                            <div class="agent-node-header">
+                                <span class="agent-node-avatar">🦞</span>
+                                <div class="agent-node-info"><div class="agent-node-name">Larz</div><div class="agent-node-role">Orchestrator</div></div>
+                                <div class="agent-node-status thinking"></div>
+                            </div>
+                            <div class="agent-node-activity">Prioritizing mission queue...</div>
+                        </div>
+                        <div class="agent-node">
+                            <div class="agent-node-header">
+                                <span class="agent-node-avatar">🔍</span>
+                                <div class="agent-node-info"><div class="agent-node-name">Scout</div><div class="agent-node-role">Researcher</div></div>
+                                <div class="agent-node-status thinking"></div>
+                            </div>
+                            <div class="agent-node-activity">Analyzing Product Hunt trends...</div>
+                        </div>
+                        <div class="agent-node">
+                            <div class="agent-node-header">
+                                <span class="agent-node-avatar">🎨</span>
+                                <div class="agent-node-info"><div class="agent-node-name">Julie</div><div class="agent-node-role">Designer</div></div>
+                                <div class="agent-node-status online"></div>
+                            </div>
+                            <div class="agent-node-activity">Awaiting assignment</div>
+                        </div>
+                        <div class="agent-node">
+                            <div class="agent-node-header">
+                                <span class="agent-node-avatar">🏗️</span>
+                                <div class="agent-node-info"><div class="agent-node-name">Engineer</div><div class="agent-node-role">Developer</div></div>
+                                <div class="agent-node-status online"></div>
+                            </div>
+                            <div class="agent-node-activity">Build environment ready</div>
+                        </div>
+                        <div class="agent-node">
+                            <div class="agent-node-header">
+                                <span class="agent-node-avatar">💡</span>
+                                <div class="agent-node-info"><div class="agent-node-name">Innovator</div><div class="agent-node-role">Strategist</div></div>
+                                <div class="agent-node-status thinking"></div>
+                            </div>
+                            <div class="agent-node-activity">Evaluating opportunities...</div>
+                        </div>
+                        <div class="agent-node">
+                            <div class="agent-node-header">
+                                <span class="agent-node-avatar">🛡️</span>
+                                <div class="agent-node-info"><div class="agent-node-name">Guardian</div><div class="agent-node-role">Auditor</div></div>
+                                <div class="agent-node-status online"></div>
+                            </div>
+                            <div class="agent-node-activity">Monitoring cost metrics</div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+            <section class="neural-feed">
+                <div class="feed-header">
+                    <h1 class="feed-title">Neural Stream</h1>
+                    <p class="feed-subtitle">Real-time agent thoughts, reasoning, and observations</p>
+                </div>
+                <div class="thought-stream" id="thought-stream">
+                    <div class="thought-card">
+                        <div class="thought-header">
+                            <div class="thought-avatar">🦞</div>
+                            <span class="thought-agent">Larz</span>
+                            <span class="thought-type reasoning">Reasoning</span>
+                            <span class="thought-time">23:00:14</span>
+                        </div>
+                        <div class="thought-content">
+                            Scout's trend analysis reveals strong demand for AI video tools (Seedance: 388↑, Lunair: 354↑). Market gap identified: SMBs want studio-quality video without editing skills. <strong>Recommendation:</strong> Prioritize video-generation MVP over prompt management tool.
+                        </div>
+                        <div class="thought-meta">
+                            <span class="thought-confidence">Confidence: 87%</span>
+                            <span>Based on 47 data points</span>
+                            <span>Sources: Product Hunt, Twitter, Reddit</span>
+                        </div>
+                    </div>
+                    <div class="thought-card">
+                        <div class="thought-header">
+                            <div class="thought-avatar">🔍</div>
+                            <span class="thought-agent">Scout</span>
+                            <span class="thought-type observation">Observation</span>
+                            <span class="thought-time">22:58:42</span>
+                        </div>
+                        <div class="thought-content">
+                            Terminal AI agents trending on HN (#3). Cline CLI 2.0 (267↑) shows developers want headless automation. Secondary insight: Windows dev environments still painful (680-point thread). Opportunity for containerized Windows dev setup.
+                        </div>
+                        <div class="thought-meta">
+                            <span>Trend velocity: High</span>
+                            <span>Signal strength: Strong</span>
+                        </div>
+                    </div>
+                    <div class="thought-card">
+                        <div class="thought-header">
+                            <div class="thought-avatar">💡</div>
+                            <span class="thought-agent">Innovator</span>
+                            <span class="thought-type action">Action</span>
+                            <span class="thought-time">22:56:18</span>
+                        </div>
+                        <div class="thought-content">
+                            Proposing overnight build: <strong>VideoGen Pro</strong> — AI explainer video generator for marketers. Leverages Scout's trend data. Estimated build time: 6 hours. Requires approval for $4.50 API budget.
+                        </div>
+                        <div class="thought-meta">
+                            <span>Ready for approval</span>
+                            <span>Est. value: $500-2000 MRR</span>
+                        </div>
+                    </div>
+                    <div class="thought-card">
+                        <div class="thought-header">
+                            <div class="thought-avatar">🛡️</div>
+                            <span class="thought-agent">Guardian</span>
+                            <span class="thought-type reasoning">Analysis</span>
+                            <span class="thought-time">22:55:03</span>
+                        </div>
+                        <div class="thought-content">
+                            Daily cost check complete. Current spend: $0.00 of $10.00 limit. Monthly projection: $12.40 of $300 budget. All systems within parameters. No cost anomalies detected in last 24h.
+                        </div>
+                        <div class="thought-meta">
+                            <span style="color:var(--success)">✓ Budget healthy</span>
+                            <span>Next check: 6 hours</span>
+                        </div>
+                    </div>
+                    <div class="thought-card">
+                        <div class="thought-header">
+                            <div class="thought-avatar">🎨</div>
+                            <span class="thought-agent">Julie</span>
+                            <span class="thought-type observation">Observation</span>
+                            <span class="thought-time">22:52:31</span>
+                        </div>
+                        <div class="thought-content">
+                            Noticed declining engagement on static landing pages. Conversational UI (Formaly: 205↑) showing 2.3x conversion improvement. Suggest A/B testing chat-based onboarding for next app launch.
+                        </div>
+                        <div class="thought-meta">
+                            <span>Design insight</span>
+                            <span>Data source: 12 case studies</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <aside class="panel">
+                <div class="panel-content">
+                    <div class="intel-section">
+                        <div class="intel-header"><span class="intel-title">🔔 Pending Actions</span><span class="intel-count">3</span></div>
+                        <div class="intel-list">
+                            <div class="intel-item urgent">
+                                <div class="intel-item-title">Approve: VideoGen Pro Build</div>
+                                <div class="intel-item-desc">Innovator requests $4.50 API budget for overnight MVP build. Est. 6 hours.</div>
+                                <div class="intel-item-meta"><span>💡 Innovator</span><span style="color:var(--accent)">$4.50</span></div>
+                                <div class="action-bar"><button class="btn-micro btn-micro-deny">Deny</button><button class="btn-micro btn-micro-approve">Approve</button></div>
+                            </div>
+                            <div class="intel-item">
+                                <div class="intel-item-title">Review: OAuth Implementation</div>
+                                <div class="intel-item-desc">Engineer completed authentication feature. Tests passing. Awaiting review.</div>
+                                <div class="intel-item-meta"><span>🏗️ Engineer</span><span style="color:var(--success)">✓ Tests pass</span></div>
+                                <div class="action-bar"><button class="btn-micro btn-micro-deny">Request Changes</button><button class="btn-micro btn-micro-approve">Merge</button></div>
+                            </div>
+                            <div class="intel-item">
+                                <div class="intel-item-title">Trend Alert: AI Video Explosion</div>
+                                <div class="intel-item-desc">Scout detected 340% increase in AI video tool launches this week.</div>
+                                <div class="intel-item-meta"><span>🔍 Scout</span><span style="color:var(--warning)">High priority</span></div>
+                                <div class="action-bar"><button class="btn-micro btn-micro-approve">Investigate</button></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="intel-section">
+                        <div class="intel-header"><span class="intel-title">⚡ Active Missions</span><span class="intel-count">2</span></div>
+                        <div class="intel-list">
+                            <div class="intel-item">
+                                <div class="intel-item-title">Product Hunt Trend Analysis</div>
+                                <div class="intel-item-desc">Deep dive on AI video tools. Analyzing 47 products for patterns.</div>
+                                <div class="intel-item-meta"><span>🔍 Scout</span><span>65% complete</span></div>
+                            </div>
+                            <div class="intel-item">
+                                <div class="intel-item-title">Overnight Build Planning</div>
+                                <div class="intel-item-desc">Evaluating build candidates and resource requirements.</div>
+                                <div class="intel-item-meta"><span>💡 Innovator</span><span>Planning phase</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="intel-section">
+                        <div class="intel-header"><span class="intel-title">💡 Key Insights</span></div>
+                        <div class="intel-list">
+                            <div class="intel-item">
+                                <div class="intel-item-title">Market Opportunity: $2.1B</div>
+                                <div class="intel-item-desc">AI video generation for SMBs. Low competition, high willingness to pay.</div>
+                                <div class="intel-item-meta"><span>Confidence: 87%</span></div>
+                            </div>
+                            <div class="intel-item">
+                                <div class="intel-item-title">Technical Debt Alert</div>
+                                <div class="intel-item-desc">Current dashboard has 3 deprecated dependencies. Recommend upgrade.</div>
+                                <div class="intel-item-meta"><span>🏗️ Engineer</span><span style="color:var(--warning)">Medium priority</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+    <script>
+        const thoughts=[
+            {agent:'🔍 Scout',name:'Scout',type:'observation',content:'New trend emerging: AI voice cloning for podcasts. Wispr Flow controversy shows trust issues but demand is real. 234 upvotes on related HN post.',meta:['Trend velocity: Medium','Signal: Emerging']},
+            {agent:'💡 Innovator',name:'Innovator',type:'reasoning',content:'Cross-referencing Scout\'s data with Julie\'s UI insights. Video + conversational interface = optimal approach. Recommend voice-guided video editor.',meta:['Strategic insight','Confidence: 82%']},
+            {agent:'🏗️ Engineer',name:'Engineer',type:'action',content:'Completed OAuth implementation. All tests passing. PR ready for review. Estimated production deployment: 2 minutes post-approval.',meta:['✓ 14 tests passed','✓ Security scan clean']},
+            {agent:'🛡️ Guardian',name:'Guardian',type:'observation',content:'Unusual API usage pattern detected from test suite. Investigating... Update: False positive. Normal behavior for OAuth flow testing.',meta:['Resolved','No action needed']}
+        ];
+        let idx=0;
+        setInterval(()=>{
+            const t=thoughts[idx%thoughts.length];
+            const time=new Date().toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+            const card=document.createElement('div');
+            card.className='thought-card';
+            card.innerHTML=`<div class="thought-header"><div class="thought-avatar">${t.agent}</div><span class="thought-agent">${t.name}</span><span class="thought-type ${t.type}">${t.type}</span><span class="thought-time">${time}</span></div><div class="thought-content">${t.content}</div><div class="thought-meta">${t.meta.map(m=>`<span>${m}</span>`).join('')}</div>`;
+            const stream=document.getElementById('thought-stream');
+            stream.insertBefore(card,stream.firstChild);
+            if(stream.children.length>10)stream.removeChild(stream.lastChild);
+            idx++;
+        },8000);
+    </script>
+</body>
+</html>
